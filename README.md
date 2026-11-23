@@ -6,15 +6,42 @@ Asisten AI super-agent untuk Android. NEXA bisa **ngobrol real-time dua arah (da
 
 ---
 
-## 🆕 Versi 4.0
+## 🆕 Versi 6.0
 
-- **Kunci API otomatis.** Gemini (AI Studio), OpenAI, Fish Audio, dan TikTok ditanam ke APK dari GitHub Secrets (`bash tools/setup_keys.sh`). Tidak perlu mengisi apa pun di aplikasi.
+- **Akun:** login/daftar dengan email atau nomor telepon, foto profil, nama panggilan, username, bio, beralih akun, keluar.
+- **Premium Rp50.000/bulan:** transfer ke BNI 2117806403 a.n. Natanel Liaha, kirim bukti ke WhatsApp 085176894962,
+  lalu aktifkan dengan kode. Premium hanya mengunci fitur asisten AI (Live, chat, panggil suara, Studio AI, kloning suara,
+  TikTok LIVE), dan kuncinya diterapkan di server. Login, pengaturan, pusat kendali, aksi cepat HP, alarm, catatan, dan galeri tetap gratis.
+- **Suara Live OpenAI:** selain suara Gemini, Live bisa memakai suara OpenAI Realtime (Marin, Cedar, Coral, dan lainnya).
+- **Kode aktivasi dari Termux:** `bash tools/buat_kode.sh`. Pilihan: 1) Premium 30 hari, 2) hadiah/gratis (jumlah hari bebas
+  atau selamanya), 3) pembuat aplikasi (selamanya, termasuk kotak saran). Semua kode dicatat di `~/nexa_kode_premium.txt`.
+- **Saran & masukan:** pengguna mengirim saran. Pembuat aplikasi melihat dan membalasnya lewat ikon 🔔 di Beranda.
+- **Live:** gaya anak muda Jaksel yang ekspresif dan berempati (bisa bercanda, curhat, dan gombal), selalu aktif tanpa batas
+  waktu (sambung ulang otomatis), mode diam ("diem dulu" → aktif lagi saat dipanggil), jawaban berdasarkan Google Search
+  beserta sumbernya, dan suara otomatis lewat headset kabel/USB/Bluetooth.
+- **Pencipta:** Nexa menjelaskan bahwa ia diciptakan oleh Natanel Liaha ("Baginda Natan"), seorang tunanetra, untuk membantu
+  para tunanetra mengendalikan HP, tablet, laptop, dan komputer. Nexa juga bisa menjelaskan semua fitur aplikasi.
+- **Suara:** 30 suara Google Gemini + 13 suara OpenAI + suara kloning dalam satu daftar. Kloning suara bisa dari audio atau
+  dari video di galeri. Video bisa memakai banyak tokoh dengan suara dan gaya bicara berbeda.
+- **Pengaturan berkategori:** Umum, Suara, Bahasa (27 bahasa), Aksesibilitas, Izin tampil di atas aplikasi lain,
+  Izin setelan terbatas (panduan), Izin & sistem, Server, Tentang.
+- **Panggil dari luar aplikasi:** sebut nama Nexa kapan saja. Dengan izin "Tampil di atas aplikasi lain", Nexa membuka dirinya
+  sebentar untuk menyalakan mikrofon, lalu kembali ke aplikasi sebelumnya.
+
+### Langkah pembuat aplikasi setelah update
+1. `bash tools/setup_server.sh`: memasang server baru, database akun, dan rahasia Premium. Kunci lama tetap dipakai, cukup Enter.
+2. Pasang APK baru, daftar/login, lalu salin **ID perangkat** di Akun → Langganan Premium.
+3. `bash tools/buat_kode.sh`, pilih **3 (pembuat aplikasi)**, lalu tempel kodenya di aplikasi dan tekan Aktifkan.
+
+## 🆕 Versi 5.0
+
+- **Server pribadi NEXA (Cloudflare Workers, gratis).** Semua kunci API (Gemini, OpenAI, Fish Audio, TikTok) disimpan di server dan diatur dari Termux dengan `bash tools/setup_server.sh`. Siapa pun yang memasang APK langsung bisa memakai semua fitur tanpa mengisi kunci, dan kunci tidak ada di dalam APK. Ganti kunci kapan saja dengan menjalankan skrip yang sama, tanpa update aplikasi.
 - **Suara Gemini otomatis.** Satu saklar ON/OFF untuk semua suara (perintah, Live, video), 30 suara Google, 4 model TTS Google dengan cadangan otomatis, dan 7 gaya bicara.
 - **Cek koneksi semua API** dengan satu tombol.
 - **Fungsi baru:** jadwal Kalender, kontrol musik, navigasi peta, salin/bagikan teks, baca papan klip. Nexa juga tahu tanggal dan jam sekarang.
 - **Tanya cepat** di Beranda dan Chat.
 
-> APK berisi kunci API Anda. Jangan bagikan file APK ke orang lain.
+> Semua pemakaian aplikasi memakai kuota kunci API Anda. Server membatasi 120 permintaan per menit per pengguna (ubah lewat variabel `RATE_PER_MIN` di Cloudflare).
 
 ---
 

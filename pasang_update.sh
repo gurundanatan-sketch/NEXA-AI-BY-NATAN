@@ -20,6 +20,6 @@ cp -a "$SRC/." "$DEST/"
 chmod +x gradlew tools/*.sh push_to_github.sh pasang_update.sh 2>/dev/null || true
 
 git add -A
-git -c user.name=Natan -c user.email=nexa@local commit -qm "NEXA AI BY NATAN v4.0 (full master)" || echo "(tidak ada perubahan)"
+git -c user.name=Natan -c user.email=nexa@local commit -qm "NEXA AI BY NATAN v6.0 (full master)" || echo "(tidak ada perubahan)"
 git push origin main
-echo "✓ v4.0 terkirim ke GitHub. Build APK berjalan otomatis di tab Actions."
+echo "✓ v6.0 terkirim ke GitHub. Build APK berjalan otomatis di tab Actions."

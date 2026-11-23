@@ -5,6 +5,11 @@
     <!-- Jaringan & suara -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Tampil di atas aplikasi lain: agar Nexa bisa dipanggil dari mana saja -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Suara Live lewat headset Bluetooth -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Berjalan di latar belakang (Live & wake word "Nexa") -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

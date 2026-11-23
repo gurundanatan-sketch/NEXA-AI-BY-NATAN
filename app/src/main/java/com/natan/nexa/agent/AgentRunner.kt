@@ -66,6 +66,7 @@ object AgentRunner {
                     pending.answer(text)
                 } else {
                     log("Perintah: $text")
+                    Prompts.userName = prefs.str("user_name"); Prompts.language = prefs.str("assistant_lang")
                     val a = GeminiAgent(prefs.geminiApiKey, prefs.agentModel, ToolExecutor(app, ::log), ::log)
                     agent = a
                     a.run(text)

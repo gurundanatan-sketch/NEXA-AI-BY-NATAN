@@ -11,6 +11,22 @@ import org.json.JSONObject
 class Prefs(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("nexa", Context.MODE_PRIVATE)
 
+    init {
+        if (Route.device.isBlank()) Route.device = try {
+            android.provider.Settings.Secure.getString(context.applicationContext.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID).orEmpty().uppercase()
+        } catch (e: Exception) { "" }
+        syncRoute()
+    }
+
+    /** Server pribadi NEXA (tools/setup_server.sh) + login + kode Premium. */
+    fun syncRoute() {
+        Route.server = str("server_url").trimEnd('/')
+        Route.token = str("app_token")
+        Route.session = raw("session")
+        Route.code = raw("premium_code")
+    }
+
     companion object {
         /** key → nilai default. Tipe default menentukan tipe penyimpanan. */
         /** Kolom kunci API: di layar ditampilkan kosong bila memakai kunci bawaan. */
@@ -21,8 +37,22 @@ class Prefs(context: Context) {
             "wake_words" to "nexa, neksa, nexsa, next a, nek sa, nexa ai",
             "wake_enabled" to false,
             "wake_mute_beep" to true,
-            "live_idle_sec" to 45,
+            "live_idle_sec" to 0,
             // --- Gemini ---
+            "server_url" to "",
+            "app_token" to "",
+            // Akun & Premium (diisi otomatis oleh layar Akun)
+            "session" to "",
+            "premium_code" to "",
+            "account" to "",
+            "accounts" to "[]",
+            "user_name" to "",
+            "auto_greet" to true,
+            "assistant_lang" to "Indonesia",
+            "voice_spec" to "",
+            // Suara Live: "gemini:Kore" (Gemini Live) atau "openai:marin" (OpenAI Realtime)
+            "live_voice_spec" to "",
+            "openai_live_model" to "gpt-realtime-2.1",
             "gemini_key" to "",
             "agent_model" to "gemini-3.8-flash",
             "live_model" to "gemini-3.8-live",
@@ -88,12 +118,15 @@ class Prefs(context: Context) {
     /** Nilai tersimpan apa adanya (tanpa kunci bawaan). */
     fun raw(k: String): String = sp.getString(k, DEFAULTS[k] as? String ?: "") ?: ""
     /** Kosong → pakai kunci bawaan dari build (GitHub Secrets), jadi tidak perlu diisi manual. */
-    fun str(k: String): String = raw(k).ifBlank { builtIn(k) }
+    fun str(k: String): String =
+        if (k in KEY_FIELDS && serverOn()) Route.SERVER   // server aktif → kunci selalu dari server
+        else raw(k).ifBlank { builtIn(k) }
+    private fun serverOn() = raw("server_url").ifBlank { BuildConfig.SERVER_URL }.isNotBlank()
     fun builtIn(k: String): String = when (k) {
-        "gemini_key" -> BuildConfig.GEMINI_KEY
-        "openai_key" -> BuildConfig.OPENAI_KEY
-        "fish_key" -> BuildConfig.FISH_KEY
-        "tt_api_key" -> BuildConfig.TIKTOK_KEY
+        "server_url" -> BuildConfig.SERVER_URL
+        "app_token" -> BuildConfig.APP_TOKEN
+        // Kunci kosong + server aktif → semua lewat server (kunci tidak ada di HP)
+        in KEY_FIELDS -> if (serverOn()) Route.SERVER else ""
         else -> ""
     }
     fun bool(k: String): Boolean = sp.getBoolean(k, DEFAULTS[k] as? Boolean ?: false)
@@ -119,10 +152,13 @@ class Prefs(context: Context) {
         }
         // true = kunci sudah tertanam otomatis dari build (tidak perlu diisi)
         KEY_FIELDS.forEach { k -> put("builtin_$k", builtIn(k).isNotEmpty()) }
+        put("server_active", serverOn())
+        remove("app_token"); remove("server_url")
     }
 
     fun applyJson(json: JSONObject) {
         json.keys().forEach { k -> if (DEFAULTS.containsKey(k)) put(k, json.get(k)) }
+        syncRoute()
     }
 
     // ---------------------------------------------------------------- named (dipakai kode lama)
@@ -131,16 +167,29 @@ class Prefs(context: Context) {
     var liveModel: String get() = str("live_model"); set(v) = put("live_model", v)
     /** true = semua suara memakai Gemini otomatis (tanpa isi kode/model manual). */
     val geminiAuto: Boolean get() = bool("gemini_voice_auto") && geminiApiKey.isNotEmpty()
+    /** Suara Live (Gemini native audio hanya mendukung suara Gemini). */
     val autoVoice: String get() = str("gemini_voice").ifBlank { "Kore" }
-    var liveVoice: String get() = if (geminiAuto) autoVoice else str("live_voice"); set(v) = put("live_voice", v)
+    /** Suara pilihan untuk asisten & video: "gemini:Kore" | "openai:marin" | "fish:<id>". */
+    val autoSpec: String get() = str("voice_spec").ifBlank { "gemini:$autoVoice" }
+    var liveVoice: String
+        get() = str("live_voice_spec").takeIf { it.startsWith("gemini:") }?.substringAfter(':')
+            ?: if (geminiAuto) autoVoice else str("live_voice")
+        set(v) = put("live_voice", v)
     var liveBargeIn: Boolean get() = bool("live_barge_in"); set(v) = put("live_barge_in", v)
     var imageModel: String get() = str("image_model"); set(v) = put("image_model", v)
-    var voiceEngine: String get() = if (geminiAuto) "gemini" else str("voice_engine"); set(v) = put("voice_engine", v)
+    var voiceEngine: String get() = if (geminiAuto) autoSpec.substringBefore(':') else str("voice_engine"); set(v) = put("voice_engine", v)
     var geminiTtsModel: String
         get() = str("tts_model").ifBlank { DEFAULTS["tts_model"] as String }
         set(v) = put("tts_model", v)
-    var geminiVoice: String get() = if (geminiAuto) autoVoice else str("tts_voice"); set(v) = put("tts_voice", v)
-    val videoVoice: String get() = if (geminiAuto) "gemini:$autoVoice" else str("video_voice")
+    var geminiVoice: String
+        get() = if (geminiAuto) (if (autoSpec.startsWith("gemini:")) autoSpec.substringAfter(':') else autoVoice) else str("tts_voice")
+        set(v) = put("tts_voice", v)
+    /** Suara OpenAI aktif (mode otomatis memakai pilihan di daftar suara). */
+    val openaiVoice: String
+        get() = if (geminiAuto && autoSpec.startsWith("openai:")) autoSpec.substringAfter(':') else str("openai_voice")
+    val fishVoice: String
+        get() = if (geminiAuto && autoSpec.startsWith("fish:")) autoSpec.substringAfter(':') else str("fish_voice")
+    val videoVoice: String get() = if (geminiAuto) autoSpec else str("video_voice")
     var sovitsUrl: String get() = str("sovits_url").trimEnd('/'); set(v) = put("sovits_url", v)
     var sovitsRefPath: String get() = str("sovits_ref"); set(v) = put("sovits_ref", v)
     var sovitsPromptText: String get() = str("sovits_prompt"); set(v) = put("sovits_prompt", v)

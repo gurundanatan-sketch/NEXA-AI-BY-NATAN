@@ -74,13 +74,16 @@ class GeminiTts(
 class OpenAiTts(
     private val apiKey: String,
     private val model: String,   // gpt-4o-mini-tts
-    private val voice: String,   // coral, alloy, nova, shimmer, echo, sage…
+    private val voice: String,   // coral, alloy, ash, ballad, echo, fable, nova, onyx, sage, shimmer, verse, marin, cedar
+    private val style: String = "",
 ) : TtsEngine {
     override suspend fun synthesize(text: String): ByteArray = withContext(Dispatchers.IO) {
         Http.post("https://api.openai.com/v1/audio/speech", JSONObject()
             .put("model", model).put("voice", voice).put("input", text)
             .put("response_format", "mp3")
-            .put("instructions", "Bicara dalam bahasa Indonesia, hangat, ekspresif, dan jelas."),
+            .put("instructions", "Bicara seperti manusia sungguhan, natural dan tidak kaku: intonasi hidup, " +
+                "jeda wajar, emosi sesuai isi kalimat (senang, kaget, sedih, bercanda). Logat Indonesia yang luwes. " +
+                "Gaya: ${style.ifBlank { "hangat, ramah, natural" }}."),
             mapOf("Authorization" to "Bearer $apiKey"))
     }
 }
@@ -94,7 +97,9 @@ class FishTts(
     private val referenceId: String, // id suara kloning; kosong = suara default
 ) : TtsEngine {
     override suspend fun synthesize(text: String): ByteArray = withContext(Dispatchers.IO) {
+        // Lebih ekspresif & tidak monoton (natural seperti manusia)
         val body = JSONObject().put("text", text).put("format", "mp3")
+            .put("normalize", true).put("temperature", 0.85).put("top_p", 0.85)
         if (referenceId.isNotBlank()) body.put("reference_id", referenceId)
         Http.post("https://api.fish.audio/v1/tts", body,
             mapOf("Authorization" to "Bearer $apiKey", "model" to model), 180_000)
@@ -105,7 +110,7 @@ class FishTts(
  * Gemini TTS otomatis: mencoba model pilihan dulu, lalu model cadangan bila model itu
  * tidak tersedia untuk kunci ini. Model yang berhasil diingat untuk panggilan berikutnya.
  */
-class GeminiAutoTts(private val p: Prefs, private val voice: String) : TtsEngine {
+class GeminiAutoTts(private val p: Prefs, private val voice: String, private val styleOverride: String = "") : TtsEngine {
     companion object {
         val MODELS = listOf(
             "gemini-3.8-flash-tts",
@@ -122,7 +127,9 @@ class GeminiAutoTts(private val p: Prefs, private val voice: String) : TtsEngine
         var last: Exception? = null
         for (m in order.distinct()) {
             try {
-                val audio = GeminiTts(p.geminiApiKey, m, voice, p.str("gemini_style").ifBlank { "hangat, ramah, natural" })
+                val audio = GeminiTts(p.geminiApiKey, m, voice,
+                    styleOverride.ifBlank { p.str("gemini_style").ifBlank { "hangat, ramah, natural" } } +
+                        ". Bicara natural seperti manusia: intonasi hidup, jeda wajar, emosi sesuai isi kalimat, tidak kaku.")
                     .synthesize(text)
                 working = m
                 return audio
@@ -139,21 +146,23 @@ class GeminiAutoTts(private val p: Prefs, private val voice: String) : TtsEngine
 
 /** Membuat mesin suara dari spesifikasi "mesin:id", mis. gemini:Kore, openai:coral, fish:<id>. */
 object Tts {
-    fun fromSpec(p: Prefs, spec: String): TtsEngine {
+    /** style: gaya bicara khusus (mis. tokoh video "ceria, bersemangat"); kosong = gaya pengaturan. */
+    fun fromSpec(p: Prefs, spec: String, style: String = ""): TtsEngine {
         val engine = spec.substringBefore(':')
         val id = spec.substringAfter(':', "")
         return when (engine) {
             "openai" -> {
                 require(p.openaiKey.isNotBlank()) { "Kunci OpenAI belum diisi di Pengaturan" }
-                OpenAiTts(p.openaiKey, p.str("openai_tts_model"), id.ifBlank { p.str("openai_voice") })
+                OpenAiTts(p.openaiKey, p.str("openai_tts_model"), id.ifBlank { p.openaiVoice },
+                    style.ifBlank { p.str("gemini_style") })
             }
             "fish" -> {
                 require(p.fishKey.isNotBlank()) { "Kunci Fish Audio belum diisi di Pengaturan" }
-                FishTts(p.fishKey, p.str("fish_model"), id.ifBlank { p.str("fish_voice") })
+                FishTts(p.fishKey, p.str("fish_model"), id.ifBlank { p.fishVoice })
             }
             else -> {
                 require(p.geminiApiKey.isNotBlank()) { "Kunci Gemini belum diisi di Pengaturan" }
-                GeminiAutoTts(p, id.ifBlank { p.geminiVoice })
+                GeminiAutoTts(p, id.ifBlank { p.geminiVoice }, style)
             }
         }
     }
@@ -219,8 +228,9 @@ class VoiceOutput(private val context: Context) {
 
     private fun engine(p: Prefs, name: String): TtsEngine? = when (name) {
         "gemini" -> if (p.geminiApiKey.isNotEmpty()) GeminiAutoTts(p, p.geminiVoice) else null
-        "openai" -> if (p.openaiKey.isNotEmpty()) OpenAiTts(p.openaiKey, p.str("openai_tts_model"), p.str("openai_voice")) else null
-        "fish" -> if (p.fishKey.isNotEmpty()) FishTts(p.fishKey, p.str("fish_model"), p.str("fish_voice")) else null
+        "openai" -> if (p.openaiKey.isNotEmpty()) OpenAiTts(p.openaiKey, p.str("openai_tts_model"), p.openaiVoice,
+            p.str("gemini_style")) else null
+        "fish" -> if (p.fishKey.isNotEmpty()) FishTts(p.fishKey, p.str("fish_model"), p.fishVoice) else null
         "sovits" -> if (p.sovitsUrl.isNotEmpty() && p.sovitsRefPath.isNotEmpty())
             GptSovitsTts(p.sovitsUrl, p.sovitsRefPath, p.sovitsPromptText, p.sovitsLang) else null
         else -> null
@@ -278,22 +288,20 @@ class VoiceOutput(private val context: Context) {
 // -------------------------------------------------------------------------
 object Http {
     fun post(url: String, body: JSONObject, headers: Map<String, String>, timeoutMs: Int = 120_000): ByteArray {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = com.natan.nexa.Route.open(url, headers).apply {
             requestMethod = "POST"
             connectTimeout = 15_000
             readTimeout = timeoutMs
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
-            headers.forEach { (k, v) -> setRequestProperty(k, v) }
         }
         conn.outputStream.use { it.write(body.toString().toByteArray()) }
         return read(conn)
     }
 
     fun get(url: String, headers: Map<String, String>, timeoutMs: Int = 120_000): ByteArray {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = com.natan.nexa.Route.open(url, headers).apply {
             connectTimeout = 15_000; readTimeout = timeoutMs
-            headers.forEach { (k, v) -> setRequestProperty(k, v) }
         }
         return read(conn)
     }
@@ -301,11 +309,10 @@ object Http {
     /** Unggah file multipart/form-data. */
     fun upload(url: String, file: File, field: String, extra: List<Pair<String, String>>, headers: Map<String, String>): ByteArray {
         val boundary = "----nexa${System.nanoTime()}"
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = com.natan.nexa.Route.open(url, headers).apply {
             requestMethod = "POST"; doOutput = true
             connectTimeout = 15_000; readTimeout = 300_000
             setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            headers.forEach { (k, v) -> setRequestProperty(k, v) }
         }
         conn.outputStream.use { out ->
             extra.forEach { (k, v) ->

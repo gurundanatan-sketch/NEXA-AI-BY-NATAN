@@ -125,20 +125,18 @@ class MediaClient(
         saveToGallery(context, bytes, name, mime, isVideo)
 
     private fun http(url: String, body: JSONObject, headers: Map<String, String>): ByteArray {
-        val c = (URL(url).openConnection() as HttpURLConnection).apply {
+        val c = com.natan.nexa.Route.open(url, headers).apply {
             requestMethod = "POST"; doOutput = true
             connectTimeout = 20_000; readTimeout = 180_000
             setRequestProperty("Content-Type", "application/json")
-            headers.forEach { (k, v) -> setRequestProperty(k, v) }
         }
         c.outputStream.use { it.write(body.toString().toByteArray()) }
         return read(c)
     }
 
     private fun httpGet(url: String, headers: Map<String, String>): ByteArray {
-        val c = (URL(url).openConnection() as HttpURLConnection).apply {
+        val c = com.natan.nexa.Route.open(url, headers).apply {
             connectTimeout = 20_000; readTimeout = 180_000
-            headers.forEach { (k, v) -> setRequestProperty(k, v) }
         }
         return read(c)
     }

@@ -135,7 +135,21 @@ class WakeWordService : Service() {
         setBeepMuted(false)
         val suffix = if (command.isNotBlank()) ": \"$command\"" else ""
         AgentRunner.log("👋 Dipanggil$suffix")
-        LiveVoiceService.start(this, greet = true, command = command)
+        // Dari luar aplikasi: Android membatasi mikrofon untuk layanan yang dimulai di latar belakang.
+        // Dengan izin "Tampil di atas aplikasi lain", Nexa membuka dirinya sebentar lalu kembali ke latar.
+        val overlayOk = android.os.Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(this)
+        if (!com.natan.nexa.MainActivity.visible && overlayOk) {
+            try {
+                startActivity(android.content.Intent(this, com.natan.nexa.MainActivity::class.java)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    .putExtra("live_wake", true).putExtra("live_command", command).putExtra("back_after", true))
+            } catch (e: Exception) {
+                LiveVoiceService.start(this, greet = true, command = command)
+            }
+        } else {
+            if (!overlayOk) AgentRunner.log("Tips: izinkan \"Tampil di atas aplikasi lain\" agar Nexa selalu bisa dipanggil dari mana saja.")
+            LiveVoiceService.start(this, greet = true, command = command)
+        }
         stopSelf()
     }
 

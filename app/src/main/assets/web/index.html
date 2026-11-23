@@ -18,7 +18,8 @@
     </div>
     <span id="liveTag" class="tag" style="display:none">● LIVE</span>
     <button class="icon-btn" data-go="control" aria-label="Pusat kendali">🎛️</button>
-    <button class="icon-btn" data-go="settings" aria-label="Pengaturan">⚙️</button>
+    <button class="icon-btn" id="notifBtn" data-go="inbox" aria-label="Notifikasi saran pengguna" style="display:none">🔔<b class="badge" id="notifBadge" style="display:none">0</b></button>
+    <button class="icon-btn avatar-btn" id="acctBtn" data-go="account" aria-label="Akun"><span id="acctAvatar">👤</span></button>
   </header>
 
   <main id="main">
@@ -43,7 +44,7 @@
 
       <div class="card glow">
         <div class="switch">
-          <div class="t">Suara Gemini otomatis<small>Semua suara Nexa memakai Gemini — tanpa isi kode</small></div>
+          <div class="t">Suara otomatis<small>Suara Google/OpenAI pilihanmu dipakai otomatis — tanpa isi kode</small></div>
           <label class="toggle"><input type="checkbox" class="gauto"><span></span></label>
         </div>
       </div>
@@ -231,6 +232,15 @@
             <label class="f">Suara narator</label>
             <select id="vVoice"><option value="gemini:Kore">Gemini Kore</option></select>
             <p class="hint">Suara kloning (Fish Audio / Gemini) muncul di sini setelah dibuat di tab <b>Suara</b>.</p>
+            <div class="switch mt">
+              <div class="t">👥 Banyak tokoh (suara berbeda)<small>Tulis naskah per baris: <b>Nama: kalimat</b>. Tiap tokoh pakai suaranya sendiri.</small></div>
+              <label class="toggle"><input type="checkbox" id="vMulti"><span></span></label>
+            </div>
+            <div id="vChars" style="display:none">
+              <div id="vCharList"></div>
+              <button class="btn ghost sm mt" id="vCharAdd">＋ Tambah tokoh</button>
+              <p class="hint">Contoh naskah:<br>Budi: Eh, kamu udah denger kabar terbaru belum?<br>Sari: Hah, kabar apa? Cerita dong!</p>
+            </div>
           </div>
 
           <div class="grid g2">
@@ -284,9 +294,11 @@
           <label class="f">Sampel suara (jernih, tanpa musik)</label>
           <div class="row">
             <button class="btn ghost sm" id="cRec">⏺ Rekam sampel</button>
-            <button class="btn ghost sm" id="cFile">📂 File</button>
+            <button class="btn ghost sm" id="cFile">🎵 File audio</button>
+            <button class="btn ghost sm" id="cVideo">🎞️ Video galeri</button>
           </div>
           <p class="hint" id="cSampleStatus">Belum ada sampel</p>
+          <p class="hint">Bisa ambil suara dari <b>audio</b> atau <b>video di galeri</b> — suaranya diambil otomatis. Pakai 10–60 detik bicara jelas, tanpa musik.</p>
           <div id="cConsentBox" style="display:none">
             <label class="f">Rekaman persetujuan (orang yang sama)</label>
             <p class="hint">Bacakan kalimat persetujuan resmi Google (lihat ai.google.dev → Voice replication).</p>
@@ -352,13 +364,72 @@
 
     <!-- ============================== PENGATURAN ============================== -->
     <section class="page" id="page-settings">
-      <div class="section-title">Pengaturan</div>
+      <div class="section-title"><button class="btn ghost sm" id="setBack" style="display:none">‹</button> <span id="setTitle">Pengaturan</span></div>
 
-      <div class="card glow">
+      <div id="setMenu" class="menu-list">
+        <button data-cat="umum"><i>⚙️</i><span>Umum<small>Nama asisten, panggilan suara, sapaan otomatis</small></span></button>
+        <button data-cat="suara"><i>🎙️</i><span>Pengaturan suara<small>Suara Google & OpenAI untuk asisten, video, dan Live</small></span></button>
+        <button data-cat="bahasa"><i>🌐</i><span>Bahasa<small>Bahasa yang dipakai Nexa saat bicara</small></span></button>
+        <button data-open="accessibility"><i>♿</i><span>Aksesibilitas<small>Izinkan Nexa mengontrol layar (wajib untuk kontrol HP)</small></span></button>
+        <button data-open="overlay"><i>🪟</i><span>Izin berjalan di atas aplikasi lain<small>Agar Nexa bisa dipanggil dari mana saja</small></span></button>
+        <button data-cat="terbatas"><i>🔓</i><span>Izin setelan terbatas<small>Buka kunci Aksesibilitas & Notifikasi (Android 13+)</small></span></button>
+        <button data-cat="izin"><i>🛡️</i><span>Izin & sistem<small>Mikrofon, notifikasi, baterai, asisten default</small></span></button>
+        <button data-cat="server"><i>🌐</i><span>Server & koneksi API<small>Cek koneksi Gemini, OpenAI, Fish Audio, TikTok</small></span></button>
+        <button data-go="premium"><i>👑</i><span>Langganan Premium<small>Rp50.000 / bulan · aktifkan dengan kode</small></span></button>
+        <button data-go="feedback"><i>💌</i><span>Kirim saran & masukan<small>Langsung ke pembuat aplikasi</small></span></button>
+        <button data-cat="tentang"><i>ℹ️</i><span>Tentang NEXA<small>Pencipta, fungsi, versi</small></span></button>
+      </div>
+
+      <div class="card" data-scat="umum">
+        <h3>⚙️ Umum</h3>
+        <div class="switch"><div class="t">Sapa otomatis saat login / buka aplikasi<small>Nexa langsung aktif dan menyapa namamu (Premium)</small></div>
+          <label class="toggle"><input type="checkbox" data-pref="auto_greet"><span></span></label></div>
+        <div class="switch"><div class="t">Panggil Nexa dengan suara<small>Ucapkan nama asisten dari luar aplikasi — atur di Beranda</small></div>
+          <button class="btn ghost sm" data-go="home">Buka</button></div>
+      </div>
+
+      <div class="card" data-scat="bahasa">
+        <h3>🌐 Bahasa Nexa</h3>
+        <label class="f">Bahasa bicara & jawaban asisten</label>
+        <select data-pref="assistant_lang">
+          <option>Indonesia</option><option>English</option><option>Jawa</option><option>Sunda</option><option>Bahasa Melayu</option>
+          <option>Batak</option><option>Minang</option><option>Bali</option><option>Bugis</option><option>Makassar</option><option>Manado</option>
+          <option>Ambon</option><option>Papua</option><option>Arab</option><option>日本語 (Jepang)</option><option>한국어 (Korea)</option><option>中文 (Mandarin)</option>
+          <option>Español</option><option>Français</option><option>Deutsch</option><option>हिन्दी (Hindi)</option><option>Tagalog</option>
+          <option>ไทย (Thai)</option><option>Tiếng Việt</option><option>Português</option><option>Русский</option><option>Türkçe</option>
+        </select>
+        <p class="hint">Nexa tetap mengikuti bahasa yang kamu pakai saat bicara. Tampilan aplikasi berbahasa Indonesia.</p>
+        <button class="btn ghost sm mt" data-open="language">Bahasa sistem HP</button>
+      </div>
+
+      <div class="card" data-scat="terbatas">
+        <h3>🔓 Izin setelan terbatas</h3>
+        <p class="hint">Android 13+ mengunci Aksesibilitas & Akses notifikasi untuk aplikasi yang dipasang dari file APK. Demi keamanan, Android <b>tidak mengizinkan aplikasi membukanya sendiri</b> — cukup sekali saja:</p>
+        <ol class="steps">
+          <li>Tekan tombol <b>Buka Info aplikasi</b> di bawah.</li>
+          <li>Tekan titik tiga <b>⋮</b> di pojok kanan atas.</li>
+          <li>Pilih <b>Izinkan setelan terbatas</b> → konfirmasi (sidik jari/PIN).</li>
+          <li>Kembali ke sini → buka <b>Aksesibilitas</b> & <b>Akses notifikasi</b> → aktifkan NEXA.</li>
+        </ol>
+        <p class="hint">Bila menu ⋮ tidak ada: buka Aksesibilitas → NEXA sekali (akan ditolak), lalu ulangi langkah di atas.</p>
+        <div class="grid g2">
+          <button class="btn sm" data-open="restricted">Buka Info aplikasi</button>
+          <button class="btn ghost sm" data-open="accessibility">Aksesibilitas</button>
+        </div>
+      </div>
+
+      <div class="card" data-scat="tentang">
+        <h3>ℹ️ Tentang NEXA AI BY NATAN</h3>
+        <p class="hint">NEXA diciptakan oleh <b>Natanel Liaha</b> — dikenal sebagai <b>"Baginda Natan"</b>, seorang tunanetra — untuk membantu para tunanetra menavigasikan HP dan mengelola atau mengontrol HP, tablet, laptop, dan komputer dengan suara.</p>
+        <p class="hint">Fitur utama: ngobrol suara real-time, kontrol HP penuh lewat suara, baca & balas notifikasi, angkat telepon, info terpercaya beserta sumbernya, asisten TikTok LIVE, Studio gambar & video banyak tokoh, kloning suara, akun & Premium.</p>
+        <button class="btn ghost sm mt" id="askAbout">🎙️ Minta Nexa menjelaskan semua fiturnya</button>
+      </div>
+
+      <div class="card glow" data-scat="server">
         <h3>🔑 Kunci & model Gemini (AI Studio)</h3>
         <label class="f">Gemini API key</label>
         <input type="password" data-pref="gemini_key" placeholder="AIza…">
-        <p class="hint">Kunci yang tertanam saat build (GitHub Secrets) dipakai <b>otomatis</b> — kolom boleh dikosongkan. Isi hanya bila ingin mengganti.</p>
+        <p class="hint" id="serverHint"></p>
         <button class="btn ghost mt" id="checkKeys">🔌 Cek koneksi semua API</button>
         <div id="keysResult" class="mt"></div>
         <details class="tpl mt"><summary><span>⚙️ Lanjutan (opsional — sudah terisi otomatis)</span></summary>
@@ -368,21 +439,21 @@
         </details>
       </div>
 
-      <div class="card">
+      <div class="card" data-scat="umum">
         <h3>🤖 Asisten</h3>
         <label class="f">Nama asisten (dipakai untuk memanggil)</label><input type="text" data-pref="assistant_name">
         <label class="f">Variasi ucapan nama (pisahkan koma)</label><input type="text" data-pref="wake_words">
         <label class="f manual-voice">Suara Live</label>
         <select data-pref="live_voice" class="manual-voice"><option value="Kore">Kore — Perempuan · tegas</option><option value="Aoede">Aoede — Perempuan · ringan</option><option value="Leda">Leda — Perempuan · muda</option><option value="Zephyr">Zephyr — Perempuan · cerah</option><option value="Callirrhoe">Callirrhoe — Perempuan · santai</option><option value="Autonoe">Autonoe — Perempuan · cerah</option><option value="Despina">Despina — Perempuan · halus</option><option value="Erinome">Erinome — Perempuan · jernih</option><option value="Laomedeia">Laomedeia — Perempuan · ceria</option><option value="Achernar">Achernar — Perempuan · lembut</option><option value="Gacrux">Gacrux — Perempuan · dewasa</option><option value="Pulcherrima">Pulcherrima — Perempuan · lugas</option><option value="Vindemiatrix">Vindemiatrix — Perempuan · lembut</option><option value="Sulafat">Sulafat — Perempuan · hangat</option><option value="Puck">Puck — Laki-laki · ceria</option><option value="Charon">Charon — Laki-laki · informatif</option><option value="Fenrir">Fenrir — Laki-laki · bersemangat</option><option value="Orus">Orus — Laki-laki · tegas</option><option value="Enceladus">Enceladus — Laki-laki · berbisik</option><option value="Iapetus">Iapetus — Laki-laki · jernih</option><option value="Umbriel">Umbriel — Laki-laki · santai</option><option value="Algieba">Algieba — Laki-laki · halus</option><option value="Algenib">Algenib — Laki-laki · serak</option><option value="Rasalgethi">Rasalgethi — Laki-laki · informatif</option><option value="Alnilam">Alnilam — Laki-laki · mantap</option><option value="Schedar">Schedar — Laki-laki · datar</option><option value="Achird">Achird — Laki-laki · ramah</option><option value="Zubenelgenubi">Zubenelgenubi — Laki-laki · kasual</option><option value="Sadachbia">Sadachbia — Laki-laki · hidup</option><option value="Sadaltager">Sadaltager — Laki-laki · berwawasan</option></select>
-        <label class="f">Tutup otomatis bila diam (detik, 0 = tidak)</label><input type="number" data-pref="live_idle_sec">
+        <p class="hint">Live selalu aktif walau lama diam — hanya mati bila kamu menyuruh (mis. "matiin live"). Bilang "diem dulu" agar Nexa diam sampai dipanggil lagi.</p>
         <div class="switch mt"><div class="t">Boleh menyela Nexa<small>Matikan bila Nexa memotong suaranya sendiri</small></div>
           <label class="toggle"><input type="checkbox" data-pref="live_barge_in"><span></span></label></div>
         <div class="switch"><div class="t">Bisukan bunyi bip pendengar<small>Saat mode panggil-suara aktif</small></div>
           <label class="toggle"><input type="checkbox" data-pref="wake_mute_beep"><span></span></label></div>
       </div>
 
-      <div class="card glow">
-        <h3>🔑 Kunci API lain</h3>
+      <div class="card glow" data-scat="server">
+        <h3>🔑 Kunci API lain & model Fish Audio</h3>
         <label class="f">OpenAI API key (transkrip suara asli & suara OpenAI)</label>
         <input type="password" data-pref="openai_key" placeholder="sk-…">
         <label class="f">Fish Audio API key (kloning suara)</label>
@@ -396,12 +467,14 @@
         <p class="hint">Aplikasi berjalan mandiri — tidak perlu Termux. Kunci API hanya tersimpan di HP ini.</p>
       </div>
 
-      <div class="card glow">
-        <h3>🎙️ Suara Gemini otomatis</h3>
-        <div class="switch"><div class="t">Aktifkan<small>Satu suara untuk perintah, ngobrol Live, dan video. Model & kunci diatur otomatis dari Gemini API key.</small></div>
+      <div class="card glow" data-scat="suara">
+        <h3>🎙️ Suara asisten otomatis</h3>
+        <div class="switch"><div class="t">Aktifkan<small>Pilih satu suara untuk perintah & video, dan satu suara untuk Live. Model & kunci diatur otomatis.</small></div>
           <label class="toggle"><input type="checkbox" class="gauto"><span></span></label></div>
-        <label class="f">Pilih suara</label>
-        <select data-pref="gemini_voice" id="gVoice"><option value="Kore">Kore — Perempuan · tegas</option><option value="Aoede">Aoede — Perempuan · ringan</option><option value="Leda">Leda — Perempuan · muda</option><option value="Zephyr">Zephyr — Perempuan · cerah</option><option value="Callirrhoe">Callirrhoe — Perempuan · santai</option><option value="Autonoe">Autonoe — Perempuan · cerah</option><option value="Despina">Despina — Perempuan · halus</option><option value="Erinome">Erinome — Perempuan · jernih</option><option value="Laomedeia">Laomedeia — Perempuan · ceria</option><option value="Achernar">Achernar — Perempuan · lembut</option><option value="Gacrux">Gacrux — Perempuan · dewasa</option><option value="Pulcherrima">Pulcherrima — Perempuan · lugas</option><option value="Vindemiatrix">Vindemiatrix — Perempuan · lembut</option><option value="Sulafat">Sulafat — Perempuan · hangat</option><option value="Puck">Puck — Laki-laki · ceria</option><option value="Charon">Charon — Laki-laki · informatif</option><option value="Fenrir">Fenrir — Laki-laki · bersemangat</option><option value="Orus">Orus — Laki-laki · tegas</option><option value="Enceladus">Enceladus — Laki-laki · berbisik</option><option value="Iapetus">Iapetus — Laki-laki · jernih</option><option value="Umbriel">Umbriel — Laki-laki · santai</option><option value="Algieba">Algieba — Laki-laki · halus</option><option value="Algenib">Algenib — Laki-laki · serak</option><option value="Rasalgethi">Rasalgethi — Laki-laki · informatif</option><option value="Alnilam">Alnilam — Laki-laki · mantap</option><option value="Schedar">Schedar — Laki-laki · datar</option><option value="Achird">Achird — Laki-laki · ramah</option><option value="Zubenelgenubi">Zubenelgenubi — Laki-laki · kasual</option><option value="Sadachbia">Sadachbia — Laki-laki · hidup</option><option value="Sadaltager">Sadaltager — Laki-laki · berwawasan</option></select>
+        <label class="f">Pilih suara asisten & video (30 Google Gemini + 13 OpenAI + suara kloningmu)</label>
+        <select data-pref="voice_spec" id="gVoice"><optgroup label="Google Gemini"><option value="gemini:Kore">Kore — Perempuan · tegas</option><option value="gemini:Aoede">Aoede — Perempuan · ringan</option><option value="gemini:Leda">Leda — Perempuan · muda</option><option value="gemini:Zephyr">Zephyr — Perempuan · cerah</option><option value="gemini:Callirrhoe">Callirrhoe — Perempuan · santai</option><option value="gemini:Autonoe">Autonoe — Perempuan · cerah</option><option value="gemini:Despina">Despina — Perempuan · halus</option><option value="gemini:Erinome">Erinome — Perempuan · jernih</option><option value="gemini:Laomedeia">Laomedeia — Perempuan · ceria</option><option value="gemini:Achernar">Achernar — Perempuan · lembut</option><option value="gemini:Gacrux">Gacrux — Perempuan · dewasa</option><option value="gemini:Pulcherrima">Pulcherrima — Perempuan · lugas</option><option value="gemini:Vindemiatrix">Vindemiatrix — Perempuan · lembut</option><option value="gemini:Sulafat">Sulafat — Perempuan · hangat</option><option value="gemini:Puck">Puck — Laki-laki · ceria</option><option value="gemini:Charon">Charon — Laki-laki · informatif</option><option value="gemini:Fenrir">Fenrir — Laki-laki · bersemangat</option><option value="gemini:Orus">Orus — Laki-laki · tegas</option><option value="gemini:Enceladus">Enceladus — Laki-laki · berbisik</option><option value="gemini:Iapetus">Iapetus — Laki-laki · jernih</option><option value="gemini:Umbriel">Umbriel — Laki-laki · santai</option><option value="gemini:Algieba">Algieba — Laki-laki · halus</option><option value="gemini:Algenib">Algenib — Laki-laki · serak</option><option value="gemini:Rasalgethi">Rasalgethi — Laki-laki · informatif</option><option value="gemini:Alnilam">Alnilam — Laki-laki · mantap</option><option value="gemini:Schedar">Schedar — Laki-laki · datar</option><option value="gemini:Achird">Achird — Laki-laki · ramah</option><option value="gemini:Zubenelgenubi">Zubenelgenubi — Laki-laki · kasual</option><option value="gemini:Sadachbia">Sadachbia — Laki-laki · hidup</option><option value="gemini:Sadaltager">Sadaltager — Laki-laki · berwawasan</option></optgroup><optgroup label="OpenAI"><option value="openai:marin">Marin — Perempuan · paling natural (baru)</option><option value="openai:cedar">Cedar — Laki-laki · paling natural (baru)</option><option value="openai:coral">Coral — Perempuan · hangat</option><option value="openai:nova">Nova — Perempuan · ceria</option><option value="openai:shimmer">Shimmer — Perempuan · lembut</option><option value="openai:sage">Sage — Perempuan · tenang</option><option value="openai:ballad">Ballad — Laki-laki · ekspresif</option><option value="openai:ash">Ash — Laki-laki · santai</option><option value="openai:verse">Verse — Laki-laki · hidup</option><option value="openai:echo">Echo — Laki-laki · jernih</option><option value="openai:onyx">Onyx — Laki-laki · berat</option><option value="openai:fable">Fable — Netral · bercerita</option><option value="openai:alloy">Alloy — Netral · seimbang</option></optgroup><optgroup label="Suara kloning" id="gVoiceClones"></optgroup></select>
+        <label class="f">Suara Live real-time (Google Gemini atau OpenAI)</label>
+        <select data-pref="live_voice_spec" id="gLiveVoice"><optgroup label="Google Gemini Live"><option value="gemini:Kore">Kore — Perempuan · tegas</option><option value="gemini:Aoede">Aoede — Perempuan · ringan</option><option value="gemini:Leda">Leda — Perempuan · muda</option><option value="gemini:Zephyr">Zephyr — Perempuan · cerah</option><option value="gemini:Callirrhoe">Callirrhoe — Perempuan · santai</option><option value="gemini:Autonoe">Autonoe — Perempuan · cerah</option><option value="gemini:Despina">Despina — Perempuan · halus</option><option value="gemini:Erinome">Erinome — Perempuan · jernih</option><option value="gemini:Laomedeia">Laomedeia — Perempuan · ceria</option><option value="gemini:Achernar">Achernar — Perempuan · lembut</option><option value="gemini:Gacrux">Gacrux — Perempuan · dewasa</option><option value="gemini:Pulcherrima">Pulcherrima — Perempuan · lugas</option><option value="gemini:Vindemiatrix">Vindemiatrix — Perempuan · lembut</option><option value="gemini:Sulafat">Sulafat — Perempuan · hangat</option><option value="gemini:Puck">Puck — Laki-laki · ceria</option><option value="gemini:Charon">Charon — Laki-laki · informatif</option><option value="gemini:Fenrir">Fenrir — Laki-laki · bersemangat</option><option value="gemini:Orus">Orus — Laki-laki · tegas</option><option value="gemini:Enceladus">Enceladus — Laki-laki · berbisik</option><option value="gemini:Iapetus">Iapetus — Laki-laki · jernih</option><option value="gemini:Umbriel">Umbriel — Laki-laki · santai</option><option value="gemini:Algieba">Algieba — Laki-laki · halus</option><option value="gemini:Algenib">Algenib — Laki-laki · serak</option><option value="gemini:Rasalgethi">Rasalgethi — Laki-laki · informatif</option><option value="gemini:Alnilam">Alnilam — Laki-laki · mantap</option><option value="gemini:Schedar">Schedar — Laki-laki · datar</option><option value="gemini:Achird">Achird — Laki-laki · ramah</option><option value="gemini:Zubenelgenubi">Zubenelgenubi — Laki-laki · kasual</option><option value="gemini:Sadachbia">Sadachbia — Laki-laki · hidup</option><option value="gemini:Sadaltager">Sadaltager — Laki-laki · berwawasan</option></optgroup><optgroup label="OpenAI Realtime"><option value="openai:marin">Marin — Perempuan · paling natural</option><option value="openai:cedar">Cedar — Laki-laki · paling natural</option><option value="openai:coral">Coral — Perempuan · hangat</option><option value="openai:shimmer">Shimmer — Perempuan · lembut</option><option value="openai:sage">Sage — Perempuan · tenang</option><option value="openai:ballad">Ballad — Laki-laki · ekspresif</option><option value="openai:ash">Ash — Laki-laki · santai</option><option value="openai:verse">Verse — Laki-laki · hidup</option><option value="openai:echo">Echo — Laki-laki · jernih</option><option value="openai:alloy">Alloy — Netral · seimbang</option></optgroup></select>
         <label class="f">Model suara Google (cadangan otomatis bila tidak tersedia)</label>
         <select data-pref="tts_model">
           <option value="gemini-3.8-flash-tts">Gemini 3.8 Flash TTS — cepat (bawaan)</option>
@@ -426,7 +499,7 @@
         <p class="hint" id="gAutoHint"></p>
       </div>
 
-      <div class="card manual-voice">
+      <div class="card manual-voice" data-scat="suara">
         <h3>🔈 Suara asisten (mode perintah)</h3>
         <label class="f">Mesin</label>
         <select data-pref="voice_engine">
@@ -443,21 +516,129 @@
         <button class="btn ghost mt" id="testVoice">▶ Tes suara</button>
       </div>
 
-      <div class="card">
+      <div class="card" data-scat="izin">
         <h3>🛡️ Izin & sistem</h3>
+        <div id="permList" class="mt"></div>
         <div class="grid g2">
+          <button class="btn ghost sm" data-open="overlay">Tampil di atas aplikasi lain</button>
+          <button class="btn ghost sm" data-cat="terbatas">Izin setelan terbatas</button>
           <button class="btn ghost sm" data-open="accessibility">Aksesibilitas</button>
           <button class="btn ghost sm" data-open="notifications">Akses notifikasi</button>
           <button class="btn ghost sm" id="permBtn">Mikrofon & telepon</button>
           <button class="btn ghost sm" data-open="battery">Abaikan hemat baterai</button>
           <button class="btn ghost sm" data-open="assistant">Asisten default</button>
           <button class="btn ghost sm" data-open="app">Info aplikasi</button>
+          <button class="btn ghost sm" data-open="bluetooth">Bluetooth / headset</button>
         </div>
         <p class="hint">Tambahkan tombol <b>NEXA Live</b> ke Pengaturan Cepat (tarik bilah notifikasi → edit) untuk memanggil Nexa dari mana saja.</p>
       </div>
 
-      <button class="btn" id="saveSettings">💾 Simpan pengaturan</button>
+      <button class="btn" id="saveSettings" style="display:none">💾 Simpan pengaturan</button>
       <p class="hint" style="text-align:center;margin:14px 0" id="verText">NEXA AI BY NATAN</p>
+    </section>
+
+    <!-- ============================== AKUN ============================== -->
+    <section class="page" id="page-account">
+      <div class="section-title">Akun</div>
+      <div class="card glow" id="acctCard">
+        <div class="profile-head" id="acctHead">
+          <div class="avatar lg" id="acctPic">👤</div>
+          <div class="pinfo"><b id="acctName">Belum login</b><small id="acctUser">Masuk untuk memakai NEXA</small><small id="acctBio"></small></div>
+          <span class="tag" id="acctTier">GRATIS</span>
+        </div>
+        <button class="btn mt" id="acctLoginBtn" data-go="login">🔐 Masuk / Daftar</button>
+      </div>
+      <div class="menu-list">
+        <button data-go="profile" class="need-login"><i>✏️</i><span>Edit profil<small>Foto, nama panggilan, username, bio</small></span></button>
+        <button data-go="premium"><i>👑</i><span>Langganan Premium<small id="acctPremSub">Rp50.000 / bulan</small></span></button>
+        <button data-go="settings"><i>⚙️</i><span>Pengaturan<small>Umum, suara, bahasa, izin, server</small></span></button>
+        <button data-go="control"><i>🎛️</i><span>Pusat kendali<small>Volume, alarm, aplikasi, catatan</small></span></button>
+        <button data-go="feedback" class="need-login"><i>💌</i><span>Kirim saran & masukan<small>Lihat juga balasan dari pembuat</small></span></button>
+        <button data-go="inbox" class="owner-only" style="display:none"><i>🔔</i><span>Notifikasi saran pengguna<small>Khusus pembuat aplikasi</small></span></button>
+        <button data-go="switch" class="need-login"><i>🔁</i><span>Beralih akun<small>Pindah ke akun lain di HP ini</small></span></button>
+        <button id="logoutBtn" class="need-login danger"><i>🚪</i><span>Keluar dari akun</span></button>
+      </div>
+    </section>
+
+    <section class="page" id="page-login">
+      <div class="section-title">Masuk ke NEXA</div>
+      <div class="card glow">
+        <div class="seg" id="loginSeg"><button data-mode="login" class="on">Masuk</button><button data-mode="register">Daftar</button></div>
+        <div id="regNameBox" style="display:none">
+          <label class="f">Nama panggilan</label><input type="text" id="loginName" placeholder="mis. Natan" autocomplete="nickname">
+        </div>
+        <label class="f">Email atau nomor telepon</label>
+        <input type="text" id="loginId" placeholder="nama@email.com atau 08xxxxxxxxxx" autocomplete="username">
+        <label class="f">Kata sandi (min. 6 karakter)</label>
+        <input type="password" id="loginPass" autocomplete="current-password">
+        <button class="btn mt" id="loginGo">Masuk</button>
+        <p class="hint">Login wajib untuk berlangganan Premium. Data akun disimpan di server pribadi NEXA.</p>
+      </div>
+    </section>
+
+    <section class="page" id="page-profile">
+      <div class="section-title">Edit profil</div>
+      <div class="card glow">
+        <div class="center-col">
+          <div class="avatar xl" id="profPic">👤</div>
+          <label class="btn ghost sm mt">📷 Ganti foto profil<input type="file" id="profPhoto" accept="image/*" hidden></label>
+        </div>
+        <label class="f">Nama panggilan</label><input type="text" id="profName" maxlength="40">
+        <label class="f">Username</label><input type="text" id="profUser" maxlength="20" placeholder="huruf kecil, angka, titik, _">
+        <label class="f">Bio</label><textarea id="profBio" maxlength="200" placeholder="Ceritakan sedikit tentang dirimu"></textarea>
+        <button class="btn mt" id="profSave">💾 Simpan profil</button>
+      </div>
+    </section>
+
+    <section class="page" id="page-premium">
+      <div class="section-title">👑 NEXA Premium</div>
+      <div class="card glow">
+        <h3>Status <span class="tag" id="premTag">GRATIS</span></h3>
+        <p class="hint" id="premStatus">Premium membuka semua fitur <b>asisten AI</b>: Live real-time, kontrol HP lewat suara, chat AI, panggil dengan suara, Studio video & gambar AI, kloning suara, asisten TikTok LIVE. Login, pengaturan, pusat kendali, aksi cepat HP, alarm, catatan, dan galeri tetap gratis.</p>
+      </div>
+      <div class="card">
+        <h3>💳 Cara berlangganan — Rp50.000 / 1 bulan</h3>
+        <ol class="steps">
+          <li>Pastikan kamu sudah <b>login</b> (email / nomor telepon).</li>
+          <li>Transfer <b>Rp50.000</b> ke <b>Bank BNI 2117806403</b> a.n. <b>Natanel Liaha</b>.
+            <button class="btn ghost sm" data-copy="2117806403">Salin no. rekening</button></li>
+          <li>Kirim bukti transfer + <b>ID perangkat</b> lewat WhatsApp <b>085176894962</b>.
+            <button class="btn sm" id="premWa">💬 Kirim bukti via WhatsApp</button></li>
+          <li>Pembuat aplikasi mengirim <b>kode aktivasi</b> untukmu. Tempel di bawah lalu tekan Aktifkan.</li>
+        </ol>
+        <label class="f">ID perangkat kamu</label>
+        <div class="row"><code class="devid" id="devId">—</code><button class="btn ghost sm" id="devCopy">Salin</button></div>
+      </div>
+      <div class="card glow">
+        <h3>🔑 Aktifkan Premium</h3>
+        <input type="text" id="premCode" placeholder="NX-…" autocapitalize="characters">
+        <button class="btn mt" id="premGo">Aktifkan</button>
+        <p class="hint">Kode hanya berlaku untuk HP ini. Premium berlaku 1 bulan; kode dari pembuat aplikasi bisa berlaku lebih lama.</p>
+      </div>
+    </section>
+
+    <section class="page" id="page-feedback">
+      <div class="section-title">💌 Saran & masukan</div>
+      <div class="card glow">
+        <label class="f">Tulis saran, masukan, atau laporan masalah</label>
+        <textarea id="fbText" maxlength="2000" placeholder="Ceritakan apa yang bisa dibuat lebih baik…"></textarea>
+        <button class="btn mt" id="fbSend">Kirim ke pembuat aplikasi</button>
+      </div>
+      <div class="card">
+        <h3>📬 Saran saya & balasan <button class="btn ghost sm auto" id="fbRefresh" style="margin-left:auto">↻</button></h3>
+        <div id="fbMine"><div class="empty">Belum ada</div></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-inbox">
+      <div class="section-title">🔔 Saran dari pengguna <button class="btn ghost sm" id="inboxRefresh">↻</button></div>
+      <div id="inboxList"><div class="empty">Memuat…</div></div>
+    </section>
+
+    <section class="page" id="page-switch">
+      <div class="section-title">🔁 Beralih akun</div>
+      <div class="menu-list" id="switchList"></div>
+      <button class="btn ghost mt" data-go="login">＋ Tambah / masuk akun lain</button>
     </section>
   </main>
 
@@ -472,5 +653,6 @@
 
 <div class="toast" id="toast"></div>
 <script src="js/app.js"></script>
+<script src="js/account.js"></script>
 </body>
 </html>

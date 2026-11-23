@@ -85,7 +85,12 @@ class NexaBridge(private val act: MainActivity) {
             "notifications" -> Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
             "battery" -> Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
             "assistant" -> Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
-            "app" -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
+            "app", "restricted" -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
+            "overlay" -> Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}"))
+            "language" -> Intent(Settings.ACTION_LOCALE_SETTINGS)
+            "sound" -> Intent(Settings.ACTION_SOUND_SETTINGS)
+            "bluetooth" -> Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+            "tts" -> Intent("com.android.settings.TTS_SETTINGS")
             else -> Intent(Settings.ACTION_SETTINGS)
         }
         try { act.startActivity(i) } catch (e: Exception) {
@@ -96,7 +101,62 @@ class NexaBridge(private val act: MainActivity) {
     @JavascriptInterface fun requestPermissions() = act.runOnUiThread {
         val perms = mutableListOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.ANSWER_PHONE_CALLS)
         if (Build.VERSION.SDK_INT >= 33) perms += Manifest.permission.POST_NOTIFICATIONS
+        if (Build.VERSION.SDK_INT >= 31) perms += Manifest.permission.BLUETOOTH_CONNECT
         act.permissionLauncher.launch(perms.toTypedArray())
+    }
+
+    /** Status izin penting untuk ditampilkan di Pengaturan. */
+    @JavascriptInterface fun permStatus(): String = JSONObject()
+        .put("overlay", Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(ctx))
+        .put("mic", has(Manifest.permission.RECORD_AUDIO))
+        .put("accessibility", com.natan.nexa.accessibility.NexaAccessibilityService.instance != null)
+        .put("notifications", androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName))
+        .put("battery", (ctx.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager)
+            .isIgnoringBatteryOptimizations(ctx.packageName))
+        .put("restricted_hint", Build.VERSION.SDK_INT >= 33)
+        .toString()
+
+    @JavascriptInterface fun copyText(text: String) { act.runOnUiThread { SystemActions(ctx).copyText(text) } }
+
+    /** ID perangkat untuk kode Premium (unik per HP + aplikasi). */
+    @JavascriptInterface fun deviceId(): String = com.natan.nexa.Route.device
+
+    /** Mulai Live dengan perintah/sapaan awal (dipakai setelah login: menyapa nama pengguna). */
+    @JavascriptInterface fun liveStart(command: String) = act.runOnUiThread {
+        if (!has(Manifest.permission.RECORD_AUDIO)) { requestPermissions(); return@runOnUiThread }
+        if (!LiveVoiceService.isActive) LiveVoiceService.start(act, greet = false, command = command)
+        else LiveVoiceService.session?.sendSystemNote(command)
+    }
+
+    /**
+     * Panggilan ke server NEXA (akun, profil, premium, saran). Hasil dikirim sebagai event
+     * "api" {id, ok, status, data} supaya UI tidak macet.
+     */
+    @JavascriptInterface fun api(id: String, method: String, path: String, body: String) {
+        scope.launch {
+            val out = JSONObject().put("id", id)
+            try {
+                require(com.natan.nexa.Route.active) { "Server NEXA belum diatur (jalankan tools/setup_server.sh di Termux)" }
+                val (code, text) = withContext(Dispatchers.IO) {
+                    val c = com.natan.nexa.Route.openServer(path).apply {
+                        requestMethod = method
+                        connectTimeout = 15_000; readTimeout = 30_000
+                        if (method == "POST") {
+                            doOutput = true
+                            setRequestProperty("Content-Type", "application/json")
+                            outputStream.use { it.write(body.toByteArray()) }
+                        }
+                    }
+                    val rc = c.responseCode
+                    rc to ((if (rc in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() } ?: "{}")
+                }
+                val data = try { JSONObject(text) } catch (e: Exception) { JSONObject().put("error", text.take(200)) }
+                out.put("ok", code in 200..299).put("status", code).put("data", data)
+            } catch (e: Exception) {
+                out.put("ok", false).put("status", 0).put("data", JSONObject().put("error", e.message ?: "Gagal terhubung"))
+            }
+            emit("api", out)
+        }
     }
 
     // ------------------------------------------------------------------ asisten
@@ -183,6 +243,7 @@ class NexaBridge(private val act: MainActivity) {
 
     /** Pilih file audio dari HP (sampel suara, suara asli, musik latar) → event "uploaded" {purpose, path}. */
     @JavascriptInterface fun pickAudio(purpose: String) = act.runOnUiThread { act.pickAudio(purpose) }
+    @JavascriptInterface fun pickVideoAudio(purpose: String) = act.runOnUiThread { act.pickVideoAudio(purpose) }
 
     @JavascriptInterface fun makeVideo(json: String): String = try {
         "OK:" + VideoJobs.start(act, JSONObject(json))
@@ -209,7 +270,8 @@ class NexaBridge(private val act: MainActivity) {
     private val geminiVoices = listOf("Kore", "Puck", "Aoede", "Charon", "Fenrir", "Leda", "Orus", "Zephyr", "Callirrhoe", "Autonoe",
         "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar",
         "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat")
-    private val openaiVoices = listOf("coral", "alloy", "nova", "shimmer", "echo", "sage")
+    private val openaiVoices = listOf("coral", "alloy", "ash", "ballad", "echo", "fable", "nova", "onyx", "sage",
+        "shimmer", "verse", "marin", "cedar")
 
     @JavascriptInterface fun voices(): String {
         val out = JSONArray()
@@ -281,6 +343,19 @@ class NexaBridge(private val act: MainActivity) {
     /** Cek semua kunci API sekaligus; hasil dikirim sebagai event "keys". */
     @JavascriptInterface fun checkKeys() {
         scope.launch {
+            if (com.natan.nexa.Route.active) {
+                // Mode server: server yang mengecek semua kunci.
+                val res = try {
+                    JSONObject(String(withContext(Dispatchers.IO) {
+                        Http.get("${com.natan.nexa.Route.server}/health?deep=1",
+                            mapOf("x-nexa-app" to com.natan.nexa.Route.token), 30_000)
+                    })).put("server", "ok")
+                } catch (e: Exception) {
+                    JSONObject().put("server", "gagal: ${e.message?.take(90)}")
+                }
+                emit("keys", res)
+                return@launch
+            }
             val out = JSONObject()
             suspend fun test(name: String, key: String, block: () -> Unit) {
                 out.put(name, when {

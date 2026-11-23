@@ -125,26 +125,45 @@ object VideoJobs {
         } else {
             // ---------------- NASKAH / TOPIK + SUARA AI / KLONING ----------------
             var script = req.optString("script").trim()
+            // Banyak tokoh = banyak suara: [{name, voice:"gemini:Puck|openai:marin|fish:<id>", style}]
+            val chars = linkedMapOf<String, Pair<String, String>>()
+            req.optJSONArray("characters")?.let { arr ->
+                for (k in 0 until arr.length()) {
+                    val c = arr.optJSONObject(k) ?: continue
+                    val n = c.optString("name").trim()
+                    if (n.isNotBlank()) chars[n.lowercase()] = c.optString("voice").ifBlank { voice } to c.optString("style")
+                }
+            }
+            val charNames = req.optJSONArray("characters")?.let { a ->
+                (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("name")?.trim()?.takeIf { n -> n.isNotBlank() } }
+            } ?: emptyList()
             if (script.isBlank()) {
                 status("Menulis naskah dari topik…", 2)
-                script = api.writeScript(req.optString("topic"), req.optDouble("duration_min", 1.0))
+                script = api.writeScript(req.optString("topic"), req.optDouble("duration_min", 1.0), charNames)
                 job.put("script", script)
             }
             status("Menyusun adegan…", 5)
             val scenes = api.planScenes(script)
             require(scenes.isNotEmpty()) { "Naskah kosong" }
-            val tts = Tts.fromSpec(p, voice)
+            val engines = mutableMapOf<String, com.natan.nexa.voice.TtsEngine>()
+            fun ttsFor(spec: String, style: String) = engines.getOrPut("$spec|$style") { Tts.fromSpec(p, spec, style) }
             var t = 0.0
             scenes.forEachIndexed { i, sc ->
                 status("Adegan ${i + 1}/${scenes.size}: suara…", 5 + 75 * i / scenes.size)
-                val audio = File(work, "a$i.mp3").apply { writeBytes(tts.synthesize(sc.narration)) }
-                val durUs = renderer.durationUs(audio).coerceAtLeast(500_000)
+                val lines = if (chars.isEmpty()) listOf<Pair<String?, String>>(null to sc.narration) else splitSpeakers(sc.narration, chars.keys)
+                var sceneUs = 0L
+                lines.forEachIndexed { j, (who, text) ->
+                    val (spec, style) = who?.let { chars[it] } ?: (voice to "")
+                    val audio = File(work, "a${i}_$j.mp3").apply { writeBytes(ttsFor(spec, style).synthesize(text)) }
+                    val d = renderer.durationUs(audio).coerceAtLeast(300_000)
+                    narration += audio
+                    if (subs) cues += chunk(text, 0.0, d / 1e6, api.wordTimes(audio), t + sceneUs / 1e6)
+                    sceneUs += d
+                }
                 status("Adegan ${i + 1}/${scenes.size}: visual…")
                 val (file, clip) = visual(i, sc.visual)
-                shots += VideoRenderer.Shot(file, clip, durUs, sc.camera)
-                narration += audio
-                if (subs) cues += chunk(sc.narration, 0.0, durUs / 1e6, api.wordTimes(audio), t)
-                t += durUs / 1e6
+                shots += VideoRenderer.Shot(file, clip, sceneUs.coerceAtLeast(500_000), sc.camera)
+                t += sceneUs / 1e6
             }
         }
 
@@ -164,6 +183,27 @@ object VideoJobs {
             .put("duration", renderer.durationUs(out) / 1_000_000)
         update(ctx, job)
         work.deleteRecursively()
+    }
+
+    /**
+     * Pecah teks adegan per tokoh berdasarkan label "Nama:". Teks tanpa label → narator (null).
+     * names = nama tokoh (huruf kecil).
+     */
+    private fun splitSpeakers(text: String, names: Set<String>): List<Pair<String?, String>> {
+        if (names.isEmpty()) return listOf(null to text)
+        val alt = names.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) }
+        val re = Regex("(?i)(?:^|(?<=[\\s.!?…\"]))($alt)\\s*:")
+        val out = mutableListOf<Pair<String?, String>>()
+        var who: String? = null
+        var last = 0
+        for (m in re.findAll(text)) {
+            val before = text.substring(last, m.range.first).trim()
+            if (before.isNotBlank()) out += who to before
+            who = m.groupValues[1].lowercase()
+            last = m.range.last + 1
+        }
+        text.substring(last).trim().takeIf { it.isNotBlank() }?.let { out += who to it }
+        return out.ifEmpty { listOf(null to text) }
     }
 
     /** Subtitle pendek ±4 kata. Pakai timestamp kata bila ada. offset = awal adegan (detik). */

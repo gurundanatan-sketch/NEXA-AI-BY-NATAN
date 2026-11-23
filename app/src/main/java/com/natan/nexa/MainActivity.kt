@@ -30,6 +30,11 @@ import org.json.JSONObject
  */
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        /** true saat layar NEXA sedang tampil (untuk memanggil Nexa dari luar aplikasi). */
+        @Volatile var visible = false
+    }
+
     lateinit var web: WebView
         private set
     private lateinit var bridge: NexaBridge
@@ -70,6 +75,36 @@ class MainActivity : AppCompatActivity() {
     fun pickAudio(purpose: String) {
         pickPurpose = purpose
         audioPicker.launch("audio/*")
+    }
+
+    /** Ambil VIDEO dari Galeri → suaranya diekstrak jadi audio (untuk kloning suara). */
+    private val videoPicker =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            val purpose = pickPurpose
+            emit(JSONObject().put("type", "toast").put("data", JSONObject().put("text", "Mengambil suara dari video…")))
+            Thread {
+                try {
+                    val dir = java.io.File(filesDir, "input").apply { mkdirs() }
+                    val vid = java.io.File(dir, "video_${System.currentTimeMillis()}.mp4")
+                    contentResolver.openInputStream(uri)?.use { input -> vid.outputStream().use { input.copyTo(it) } }
+                    val f = com.natan.nexa.studio.AudioExtract.toM4a(vid, java.io.File(dir, "${purpose}_${System.currentTimeMillis()}.m4a"))
+                    vid.delete()
+                    runOnUiThread {
+                        emit(JSONObject().put("type", "uploaded").put("data",
+                            JSONObject().put("purpose", purpose).put("path", f.absolutePath).put("name", f.name)))
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        emit(JSONObject().put("type", "toast").put("data", JSONObject().put("text", "Gagal mengambil suara video: ${e.message}")))
+                    }
+                }
+            }.start()
+        }
+
+    fun pickVideoAudio(purpose: String) {
+        pickPurpose = purpose
+        videoPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
     }
 
     val permissionLauncher =
@@ -138,6 +173,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("live_wake", false) == true) {
+            intent.removeExtra("live_wake")
+            if (!LiveVoiceService.isActive) LiveVoiceService.start(this, greet = true,
+                command = intent.getStringExtra("live_command").orEmpty())
+            // Dipanggil dari luar aplikasi → kembali ke aplikasi sebelumnya, Nexa tetap mendengarkan.
+            if (intent.getBooleanExtra("back_after", false)) web.postDelayed({ moveTaskToBack(true) }, 1200)
+            return
+        }
         when {
             intent?.getBooleanExtra("start_wake", false) == true -> WakeWordService.start(this)
             // Dipanggil sebagai aplikasi asisten (tahan tombol Home/Power, bila dipilih di pengaturan)
@@ -146,8 +189,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        visible = false
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
+        visible = true
         emitStatus()
     }
 

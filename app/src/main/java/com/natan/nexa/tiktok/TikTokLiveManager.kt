@@ -75,8 +75,12 @@ object TikTokLiveManager {
                     emitInfo("Isi API key ${if (provider == "euler") "Euler Stream (eulerstream.com)" else "TikTool (tik.tools)"} di Pengaturan TikTok")
                     return "GAGAL: API key TikTok belum diisi"
                 }
-                val url = if (provider == "euler") "wss://ws.eulerstream.com?uniqueId=$enc&apiKey=$key"
-                else "wss://api.tik.tools?uniqueId=$enc&apiKey=$key"
+                val url = when {
+                    key == com.natan.nexa.Route.SERVER ->
+                        "${com.natan.nexa.Route.wsBase()}/tiktok-ws?provider=$provider&uniqueId=$enc"
+                    provider == "euler" -> "wss://ws.eulerstream.com?uniqueId=$enc&apiKey=$key"
+                    else -> "wss://api.tik.tools?uniqueId=$enc&apiKey=$key"
+                }
                 direct = true
                 openSocket(url)
                 emitInfo("Menyambung langsung ke live @$user…")
@@ -146,7 +150,10 @@ object TikTokLiveManager {
     private fun openSocket(url: String) {
         manualClose = false
         ws?.close(1000, null)
-        ws = client.newWebSocket(Request.Builder().url(url).build(), object : WebSocketListener() {
+        val viaServer = com.natan.nexa.Route.active && url.startsWith(com.natan.nexa.Route.wsBase())
+        val req = Request.Builder().url(url)
+            .apply { if (viaServer) com.natan.nexa.Route.authHeaders().forEach { (k, v) -> header(k, v) } }.build()
+        ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 connected = true
                 if (direct) scope.launch { handle(JSONObject().put("type", "connected").put("username", lastUser)) }

@@ -56,11 +56,20 @@ class StudioApi(private val p: Prefs) {
     // ------------------------------------------------------------------ naskah & adegan
     private val cameraEnum = JSONArray(listOf("zoom_in", "zoom_out", "pan_left", "pan_right", "static"))
 
-    fun writeScript(topic: String, minutes: Double): String {
+    fun writeScript(topic: String, minutes: Double, characters: List<String> = emptyList()): String {
         val words = (maxOf(0.3, minutes) * 140).toInt()
+        if (characters.isNotEmpty()) {
+            val names = characters.joinToString(", ")
+            return text("Tulis naskah video berbahasa Indonesia berbentuk DIALOG antar tokoh tentang: $topic\n" +
+                "Tokoh: $names. Panjang sekitar $words kata (≈$minutes menit). Setiap baris WAJIB diawali nama tokoh " +
+                "lalu titik dua, mis. \"${characters.first()}: Halo semuanya!\". Bahasa lisan yang hidup & natural: " +
+                "pakai seruan, tanya balik, tawa (\"haha\"), kaget (\"hah?!\"), jeda (\"…\"), dan emosi yang terasa " +
+                "lewat pilihan kata & tanda baca. Tanpa judul, tanpa keterangan adegan dalam kurung, tanpa emoji.").trim()
+        }
         return text("Tulis naskah narasi video berbahasa Indonesia tentang: $topic\n" +
             "Panjang sekitar $words kata (≈$minutes menit dibacakan). Pembuka memancing rasa penasaran, isi padat, " +
-            "penutup dengan ajakan. Tulis HANYA teks narasi, tanpa judul, tanpa tanda adegan, tanpa emoji.").trim()
+            "penutup dengan ajakan. Gunakan bahasa lisan yang hidup & ekspresif (tanda baca, seruan, jeda) agar " +
+            "dibacakan dengan natural. Tulis HANYA teks narasi, tanpa judul, tanpa tanda adegan, tanpa emoji.").trim()
     }
 
     data class Scene(val narration: String, val visual: String, val camera: String)
@@ -74,7 +83,8 @@ class StudioApi(private val p: Prefs) {
             .put("required", JSONArray(listOf("narration", "visual", "camera"))))
         val arr = JSONArray(text(
             "Pecah naskah ini menjadi adegan berurutan (maks $MAX_SCENES, tiap adegan 1–3 kalimat, ±5–10 detik). " +
-                "narration = teks PERSIS dari naskah (jangan diringkas/diubah). visual = deskripsi sinematik bahasa Inggris " +
+                "narration = teks PERSIS dari naskah (jangan diringkas/diubah; bila ada label nama tokoh seperti " +
+                "\"Budi: …\", label itu WAJIB dipertahankan dan tiap baris tokoh dipisah baris baru). visual = deskripsi sinematik bahasa Inggris " +
                 "untuk AI gambar/video, tokoh & gaya konsisten antar adegan, tanpa teks di gambar. camera = gerakan kamera.\n\n" +
                 "NASKAH:\n$script", schema))
         return (0 until minOf(arr.length(), MAX_SCENES)).map {

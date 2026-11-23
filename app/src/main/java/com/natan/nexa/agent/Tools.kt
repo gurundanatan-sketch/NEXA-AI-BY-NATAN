@@ -121,7 +121,10 @@ object Tools {
                 .put("duration_min", int("Durasi menit")), listOf("title", "start")))
         .apply {
             if (forLive) {
-                put(fn("end_conversation", "Akhiri percakapan suara bila pengguna pamit/selesai (mis. 'udah', 'makasih Nexa', 'sampai nanti')."))
+                put(fn("end_conversation", "Matikan Live HANYA bila pengguna jelas menyuruh menutup/mematikan Live (mis. 'matiin live', 'tutup live')."))
+                put(fn("quiet_mode", "Mode diam: on=true saat pengguna menyuruh diam (sedang bicara dengan orang lain); " +
+                    "on=false saat pengguna bilang sudah boleh ngobrol lagi.",
+                    JSONObject().put("on", bool("true = diam, false = bicara lagi")), listOf("on")))
             }
             if (!forLive) {
                 put(fn("ask_user", "Tanya atau minta konfirmasi pengguna. Menghentikan tugas sampai pengguna menjawab.",

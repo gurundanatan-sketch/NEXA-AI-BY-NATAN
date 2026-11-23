@@ -81,13 +81,12 @@ class GeminiAgent(
             .put("tools", JSONArray().put(JSONObject().put("functionDeclarations", Tools.declarations())))
             .put("toolConfig", JSONObject().put("functionCallingConfig", JSONObject().put("mode", "ANY")))
 
-        val conn = (URL(ENDPOINT.format(model)).openConnection() as HttpURLConnection).apply {
+        val conn = com.natan.nexa.Route.open(ENDPOINT.format(model), mapOf("x-goog-api-key" to apiKey)).apply {
             requestMethod = "POST"
             connectTimeout = 20_000
             readTimeout = 60_000
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("x-goog-api-key", apiKey)
         }
         conn.outputStream.use { it.write(body.toString().toByteArray()) }
         val code = conn.responseCode
