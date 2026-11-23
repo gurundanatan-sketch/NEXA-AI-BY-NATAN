@@ -15,7 +15,19 @@ android {
         // APK baru selalu bisa menimpa versi lama (dengan tanda tangan yang sama).
         val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
         versionCode = 100 + run
-        versionName = "3.0.$run"
+        versionName = "4.0.$run"
+
+        // Kunci API tertanam otomatis dari GitHub Secrets (tidak pernah ditulis di kode/repo).
+        fun secret(name: String) = "\"" + (System.getenv(name) ?: "").trim()
+            .replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        buildConfigField("String", "GEMINI_KEY", secret("NEXA_GEMINI_KEY"))
+        buildConfigField("String", "OPENAI_KEY", secret("NEXA_OPENAI_KEY"))
+        buildConfigField("String", "FISH_KEY", secret("NEXA_FISH_KEY"))
+        buildConfigField("String", "TIKTOK_KEY", secret("NEXA_TIKTOK_KEY"))
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     signingConfigs {

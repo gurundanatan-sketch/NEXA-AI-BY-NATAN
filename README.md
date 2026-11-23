@@ -6,6 +6,18 @@ Asisten AI super-agent untuk Android. NEXA bisa **ngobrol real-time dua arah (da
 
 ---
 
+## 🆕 Versi 4.0
+
+- **Kunci API otomatis.** Gemini (AI Studio), OpenAI, Fish Audio, dan TikTok ditanam ke APK dari GitHub Secrets (`bash tools/setup_keys.sh`). Tidak perlu mengisi apa pun di aplikasi.
+- **Suara Gemini otomatis.** Satu saklar ON/OFF untuk semua suara (perintah, Live, video), 30 suara Google, 4 model TTS Google dengan cadangan otomatis, dan 7 gaya bicara.
+- **Cek koneksi semua API** dengan satu tombol.
+- **Fungsi baru:** jadwal Kalender, kontrol musik, navigasi peta, salin/bagikan teks, baca papan klip. Nexa juga tahu tanggal dan jam sekarang.
+- **Tanya cepat** di Beranda dan Chat.
+
+> APK berisi kunci API Anda. Jangan bagikan file APK ke orang lain.
+
+---
+
 ## ✨ Fitur
 
 | Menu | Isi |
@@ -18,7 +30,7 @@ Asisten AI super-agent untuk Android. NEXA bisa **ngobrol real-time dua arah (da
 | **Pusat Kendali** 🎛️ | Volume, alarm, timer, buka aplikasi, catatan |
 | **Pengaturan** ⚙️ | Kunci & model, nama asisten, wake word, suara, kunci API (Gemini, OpenAI, Fish Audio), izin sistem |
 
-Fungsi yang bisa dipanggil AI (lewat suara atau teks): baca layar, klik, ketik, scroll, Back/Home, buka aplikasi, WhatsApp, dialer, senter, volume, panel Wi-Fi/Bluetooth, alarm, timer, catatan, info baterai, baca & balas notifikasi, angkat/tolak telepon, Google Search, buat gambar, buat video, kontrol TikTok Live, akhiri percakapan.
+Fungsi yang bisa dipanggil AI (lewat suara atau teks): jadwal Kalender, kontrol musik, navigasi, salin/bagikan teks, papan klip, baca layar, klik, ketik, scroll, Back/Home, buka aplikasi, WhatsApp, dialer, senter, volume, panel Wi-Fi/Bluetooth, alarm, timer, catatan, info baterai, baca & balas notifikasi, angkat/tolak telepon, Google Search, buat gambar, buat video, kontrol TikTok Live, akhiri percakapan.
 
 ---
 

@@ -41,6 +41,24 @@
         </div>
       </div>
 
+      <div class="card glow">
+        <div class="switch">
+          <div class="t">Suara Gemini otomatis<small>Semua suara Nexa memakai Gemini — tanpa isi kode</small></div>
+          <label class="toggle"><input type="checkbox" class="gauto"><span></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>✨ Tanya cepat</h3>
+        <div class="chips">
+          <button class="chip" data-say="Ringkas semua notifikasi terbaru">🔔 Ringkas notifikasi</button>
+          <button class="chip" data-say="Berita terbaru hari ini apa?">📰 Berita</button>
+          <button class="chip" data-say="Cuaca hari ini di kotaku bagaimana?">🌤️ Cuaca</button>
+          <button class="chip" data-say="Terjemahkan teks yang kusalin ke bahasa Inggris">🌐 Terjemahkan</button>
+          <button class="chip" data-say="Kasih 5 ide konten TikTok live yang lagi tren">💡 Ide konten</button>
+        </div>
+      </div>
+
       <div class="card">
         <h3>⚡ Aksi cepat</h3>
         <div class="grid g4">
@@ -77,6 +95,13 @@
         <button class="chip" data-say="Berita terbaru hari ini apa?">📰 Berita</button>
         <button class="chip" data-say="Pasang alarm jam 5 pagi">⏰ Alarm</button>
         <button class="chip" data-say="Info baterai HP">🔋 Baterai</button>
+        <button class="chip" data-say="Ringkas semua notifikasi terbaru">🔔 Ringkas notifikasi</button>
+        <button class="chip" data-say="Cuaca hari ini di kotaku bagaimana?">🌤️ Cuaca</button>
+        <button class="chip" data-say="Terjemahkan teks yang kusalin ke bahasa Inggris">🌐 Terjemahkan salinan</button>
+        <button class="chip" data-say="Putar atau jeda musik">⏯️ Musik</button>
+        <button class="chip" data-say="Kasih 5 ide konten TikTok live yang lagi tren">💡 Ide konten</button>
+        <button class="chip" data-say="Buatkan jadwal rapat besok jam 9 pagi">📅 Jadwal</button>
+        <button class="chip" data-say="Arahkan aku ke SPBU terdekat">🧭 Navigasi</button>
       </div>
       <div class="chat" id="chat"></div>
       <div class="composer">
@@ -333,21 +358,22 @@
         <h3>🔑 Kunci & model Gemini (AI Studio)</h3>
         <label class="f">Gemini API key</label>
         <input type="password" data-pref="gemini_key" placeholder="AIza…">
-        <p class="hint">Dapatkan di <a href="#" data-url="https://aistudio.google.com/apikey" style="color:var(--cyan)">aistudio.google.com/apikey</a>. Semua kunci tersimpan hanya di HP ini.</p>
-        <label class="f">Model agen</label><input type="text" data-pref="agent_model">
-        <label class="f">Model Live (ngobrol real-time)</label><input type="text" data-pref="live_model">
-        <label class="f">Model gambar</label><input type="text" data-pref="image_model">
+        <p class="hint">Kunci yang tertanam saat build (GitHub Secrets) dipakai <b>otomatis</b> — kolom boleh dikosongkan. Isi hanya bila ingin mengganti.</p>
+        <button class="btn ghost mt" id="checkKeys">🔌 Cek koneksi semua API</button>
+        <div id="keysResult" class="mt"></div>
+        <details class="tpl mt"><summary><span>⚙️ Lanjutan (opsional — sudah terisi otomatis)</span></summary>
+          <label class="f">Model agen</label><input type="text" data-pref="agent_model">
+          <label class="f">Model Live (ngobrol real-time)</label><input type="text" data-pref="live_model">
+          <label class="f">Model gambar</label><input type="text" data-pref="image_model">
+        </details>
       </div>
 
       <div class="card">
         <h3>🤖 Asisten</h3>
         <label class="f">Nama asisten (dipakai untuk memanggil)</label><input type="text" data-pref="assistant_name">
         <label class="f">Variasi ucapan nama (pisahkan koma)</label><input type="text" data-pref="wake_words">
-        <label class="f">Suara Live</label>
-        <select data-pref="live_voice">
-          <option>Kore</option><option>Puck</option><option>Aoede</option><option>Charon</option>
-          <option>Fenrir</option><option>Leda</option><option>Orus</option><option>Zephyr</option>
-        </select>
+        <label class="f manual-voice">Suara Live</label>
+        <select data-pref="live_voice" class="manual-voice"><option value="Kore">Kore — Perempuan · tegas</option><option value="Aoede">Aoede — Perempuan · ringan</option><option value="Leda">Leda — Perempuan · muda</option><option value="Zephyr">Zephyr — Perempuan · cerah</option><option value="Callirrhoe">Callirrhoe — Perempuan · santai</option><option value="Autonoe">Autonoe — Perempuan · cerah</option><option value="Despina">Despina — Perempuan · halus</option><option value="Erinome">Erinome — Perempuan · jernih</option><option value="Laomedeia">Laomedeia — Perempuan · ceria</option><option value="Achernar">Achernar — Perempuan · lembut</option><option value="Gacrux">Gacrux — Perempuan · dewasa</option><option value="Pulcherrima">Pulcherrima — Perempuan · lugas</option><option value="Vindemiatrix">Vindemiatrix — Perempuan · lembut</option><option value="Sulafat">Sulafat — Perempuan · hangat</option><option value="Puck">Puck — Laki-laki · ceria</option><option value="Charon">Charon — Laki-laki · informatif</option><option value="Fenrir">Fenrir — Laki-laki · bersemangat</option><option value="Orus">Orus — Laki-laki · tegas</option><option value="Enceladus">Enceladus — Laki-laki · berbisik</option><option value="Iapetus">Iapetus — Laki-laki · jernih</option><option value="Umbriel">Umbriel — Laki-laki · santai</option><option value="Algieba">Algieba — Laki-laki · halus</option><option value="Algenib">Algenib — Laki-laki · serak</option><option value="Rasalgethi">Rasalgethi — Laki-laki · informatif</option><option value="Alnilam">Alnilam — Laki-laki · mantap</option><option value="Schedar">Schedar — Laki-laki · datar</option><option value="Achird">Achird — Laki-laki · ramah</option><option value="Zubenelgenubi">Zubenelgenubi — Laki-laki · kasual</option><option value="Sadachbia">Sadachbia — Laki-laki · hidup</option><option value="Sadaltager">Sadaltager — Laki-laki · berwawasan</option></select>
         <label class="f">Tutup otomatis bila diam (detik, 0 = tidak)</label><input type="number" data-pref="live_idle_sec">
         <div class="switch mt"><div class="t">Boleh menyela Nexa<small>Matikan bila Nexa memotong suaranya sendiri</small></div>
           <label class="toggle"><input type="checkbox" data-pref="live_barge_in"><span></span></label></div>
@@ -370,7 +396,37 @@
         <p class="hint">Aplikasi berjalan mandiri — tidak perlu Termux. Kunci API hanya tersimpan di HP ini.</p>
       </div>
 
-      <div class="card">
+      <div class="card glow">
+        <h3>🎙️ Suara Gemini otomatis</h3>
+        <div class="switch"><div class="t">Aktifkan<small>Satu suara untuk perintah, ngobrol Live, dan video. Model & kunci diatur otomatis dari Gemini API key.</small></div>
+          <label class="toggle"><input type="checkbox" class="gauto"><span></span></label></div>
+        <label class="f">Pilih suara</label>
+        <select data-pref="gemini_voice" id="gVoice"><option value="Kore">Kore — Perempuan · tegas</option><option value="Aoede">Aoede — Perempuan · ringan</option><option value="Leda">Leda — Perempuan · muda</option><option value="Zephyr">Zephyr — Perempuan · cerah</option><option value="Callirrhoe">Callirrhoe — Perempuan · santai</option><option value="Autonoe">Autonoe — Perempuan · cerah</option><option value="Despina">Despina — Perempuan · halus</option><option value="Erinome">Erinome — Perempuan · jernih</option><option value="Laomedeia">Laomedeia — Perempuan · ceria</option><option value="Achernar">Achernar — Perempuan · lembut</option><option value="Gacrux">Gacrux — Perempuan · dewasa</option><option value="Pulcherrima">Pulcherrima — Perempuan · lugas</option><option value="Vindemiatrix">Vindemiatrix — Perempuan · lembut</option><option value="Sulafat">Sulafat — Perempuan · hangat</option><option value="Puck">Puck — Laki-laki · ceria</option><option value="Charon">Charon — Laki-laki · informatif</option><option value="Fenrir">Fenrir — Laki-laki · bersemangat</option><option value="Orus">Orus — Laki-laki · tegas</option><option value="Enceladus">Enceladus — Laki-laki · berbisik</option><option value="Iapetus">Iapetus — Laki-laki · jernih</option><option value="Umbriel">Umbriel — Laki-laki · santai</option><option value="Algieba">Algieba — Laki-laki · halus</option><option value="Algenib">Algenib — Laki-laki · serak</option><option value="Rasalgethi">Rasalgethi — Laki-laki · informatif</option><option value="Alnilam">Alnilam — Laki-laki · mantap</option><option value="Schedar">Schedar — Laki-laki · datar</option><option value="Achird">Achird — Laki-laki · ramah</option><option value="Zubenelgenubi">Zubenelgenubi — Laki-laki · kasual</option><option value="Sadachbia">Sadachbia — Laki-laki · hidup</option><option value="Sadaltager">Sadaltager — Laki-laki · berwawasan</option></select>
+        <label class="f">Model suara Google (cadangan otomatis bila tidak tersedia)</label>
+        <select data-pref="tts_model">
+          <option value="gemini-3.8-flash-tts">Gemini 3.8 Flash TTS — cepat (bawaan)</option>
+          <option value="gemini-3.1-flash-tts-preview">Gemini 3.1 Flash TTS (preview)</option>
+          <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS</option>
+          <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro TTS — paling ekspresif</option>
+        </select>
+        <label class="f">Gaya bicara</label>
+        <select data-pref="gemini_style">
+          <option value="hangat, ramah, natural">Hangat & ramah</option>
+          <option value="ceria, bersemangat, energik">Ceria & bersemangat</option>
+          <option value="tenang, lembut, menenangkan">Tenang & lembut</option>
+          <option value="profesional, jelas, seperti penyiar berita">Profesional (penyiar)</option>
+          <option value="santai, gaul, seperti teman ngobrol">Santai & gaul</option>
+          <option value="dramatis, penuh emosi, seperti narator film">Narator dramatis</option>
+          <option value="berbisik pelan, intim">Berbisik</option>
+        </select>
+        <div class="grid g2 mt">
+          <button class="btn ghost" id="gVoiceTest">▶ Dengarkan</button>
+          <button class="btn" id="gVoiceNew">➕ Buat suara baru</button>
+        </div>
+        <p class="hint" id="gAutoHint"></p>
+      </div>
+
+      <div class="card manual-voice">
         <h3>🔈 Suara asisten (mode perintah)</h3>
         <label class="f">Mesin</label>
         <select data-pref="voice_engine">

@@ -78,7 +78,7 @@ object VideoJobs {
         val aspect = req.optString("aspect", "9:16")
         val (w, h) = when (aspect) { "16:9" -> 1920 to 1080; "1:1" -> 1080 to 1080; else -> 1080 to 1920 }
         val mode = req.optString("mode", "images")
-        val voice = req.optString("voice").ifBlank { p.str("video_voice") }
+        val voice = req.optString("voice").ifBlank { p.videoVoice }
         val subs = req.optBoolean("subtitles", true)
         val renderer = VideoRenderer(ctx)
 

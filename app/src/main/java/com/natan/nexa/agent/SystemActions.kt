@@ -1,6 +1,8 @@
 package com.natan.nexa.agent
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,6 +11,10 @@ import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.net.Uri
 import android.provider.AlarmClock
+import android.provider.CalendarContract
+import android.view.KeyEvent
+import java.text.SimpleDateFormat
+import java.util.Locale
 import android.provider.Settings
 
 /**
@@ -146,6 +152,60 @@ class SystemActions(private val context: Context) {
     }
 
     @Suppress("unused")
+    // ------------------------------------------------------------ fitur pendukung
+    fun copyText(text: String): String {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("NEXA", text))
+        return "OK: teks disalin ke papan klip"
+    }
+
+    fun readClipboard(): String {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = cm.primaryClip
+        val t = if (clip != null && clip.itemCount > 0) clip.getItemAt(0).coerceToText(context)?.toString() else null
+        return if (t.isNullOrBlank()) "Papan klip kosong (Android 10+ hanya mengizinkan saat NEXA terbuka)"
+        else "PAPAN KLIP: ${t.take(3000)}"
+    }
+
+    /** action: play_pause | next | previous | stop */
+    fun mediaControl(action: String): String {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val code = when (action) {
+            "next" -> KeyEvent.KEYCODE_MEDIA_NEXT
+            "previous" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            "stop" -> KeyEvent.KEYCODE_MEDIA_STOP
+            else -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+        }
+        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+        return "OK: media $action"
+    }
+
+    /** mode: drive | walk | motor */
+    fun navigate(place: String, mode: String): String {
+        val m = when (mode) { "walk" -> "w"; "motor" -> "l"; else -> "d" }
+        val ok = start(Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=${Uri.encode(place)}&mode=$m")))
+            || start(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(place)}")))
+        return if (ok) "OK: navigasi ke $place dibuka" else "GAGAL: aplikasi peta tidak ditemukan"
+    }
+
+    fun shareText(text: String): String {
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+        return if (start(Intent.createChooser(send, "Bagikan lewat"))) "OK: menu bagikan dibuka" else "GAGAL: tidak bisa membagikan"
+    }
+
+    /** start: "yyyy-MM-dd HH:mm" (waktu HP). */
+    fun addCalendarEvent(title: String, startAt: String, durationMin: Int): String {
+        val begin = try {
+            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).parse(startAt.trim())?.time
+        } catch (e: Exception) { null } ?: return "GAGAL: format waktu harus yyyy-MM-dd HH:mm"
+        val i = Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
+            .putExtra(CalendarContract.Events.TITLE, title)
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, begin)
+            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, begin + durationMin.coerceAtLeast(5) * 60_000L)
+        return if (start(i)) "OK: jadwal '$title' dibuka di Kalender, tinggal simpan" else "GAGAL: aplikasi kalender tidak ada"
+    }
+
     private fun isInstalled(pkg: String): Boolean = try {
         context.packageManager.getPackageInfo(pkg, 0); true
     } catch (e: PackageManager.NameNotFoundException) {

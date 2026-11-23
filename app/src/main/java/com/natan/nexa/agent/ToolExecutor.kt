@@ -46,7 +46,7 @@ class ToolExecutor(context: Context, private val log: (String) -> Unit) {
     /** Fungsi yang mengubah layar → hasilnya disertai isi layar terbaru. */
     private val screenChanging = setOf(
         "open_app", "click", "type_text", "scroll", "press_key", "open_url",
-        "dial", "send_whatsapp", "open_settings", "wait", "read_screen",
+        "dial", "send_whatsapp", "open_settings", "wait", "read_screen", "navigate", "share_text",
     )
 
     val assistantName: String get() = prefs.assistantName
@@ -99,6 +99,13 @@ class ToolExecutor(context: Context, private val log: (String) -> Unit) {
             "set_alarm" -> system.setAlarm(a.getInt("hour"), a.getInt("minute"), a.optString("label", "NEXA"))
             "set_timer" -> system.setTimer(a.getInt("seconds"), a.optString("label", "NEXA"))
             "device_info" -> system.deviceInfo()
+            "copy_to_clipboard" -> system.copyText(a.getString("text"))
+            "read_clipboard" -> system.readClipboard()
+            "media_control" -> system.mediaControl(a.optString("action", "play_pause"))
+            "navigate" -> system.navigate(a.getString("place"), a.optString("mode", "drive"))
+            "share_text" -> system.shareText(a.getString("text"))
+            "add_calendar_event" -> system.addCalendarEvent(
+                a.getString("title"), a.getString("start"), a.optInt("duration_min", 60))
 
             // --- notifikasi & chat ---
             "read_notifications" -> notif?.recent(a.optString("app", ""), a.optInt("limit", 10))
@@ -130,7 +137,7 @@ class ToolExecutor(context: Context, private val log: (String) -> Unit) {
                 // Video dibuat di dalam aplikasi (latar belakang); pengguna diberi tahu saat selesai.
                 val req = JSONObject()
                     .put("mode", a.optString("mode", "images"))
-                    .put("voice", a.optString("voice").ifBlank { prefs.str("video_voice") })
+                    .put("voice", a.optString("voice").ifBlank { prefs.videoVoice })
                     .put("aspect", a.optString("aspect", "9:16"))
                     .put("duration_min", a.optDouble("duration_min", 1.0))
                 if (a.optString("script").isNotBlank()) req.put("script", a.getString("script"))

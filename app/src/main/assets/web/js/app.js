@@ -50,7 +50,50 @@
     $('#orbHint').innerHTML = `Ketuk orb untuk ngobrol, atau ucapkan <b>"${esc(S.assistant_name || 'Nexa')}"</b>`;
     $('#ttUser').value = S.tt_username || '';
     renderTemplates();
+    syncGeminiAuto();
+    // Kunci tertanam otomatis → tampilkan status, kolom boleh kosong
+    [['gemini_key', 'AIza…'], ['openai_key', 'sk-…'], ['fish_key', '…'], ['tt_api_key', 'dari eulerstream.com atau tik.tools']].forEach(([k, ph]) => {
+      const el = $(`[data-pref="${k}"]`);
+      if (el) el.placeholder = S['builtin_' + k] ? '✓ Terpasang otomatis' : ph;
+    });
   }
+
+  // ---------------------------------------------------------------- suara Gemini otomatis (satu saklar)
+  function syncGeminiAuto() {
+    const on = S.gemini_voice_auto !== false;
+    $$('.gauto').forEach((c) => (c.checked = on));
+    $$('.manual-voice').forEach((el) => (el.style.display = on ? 'none' : ''));
+    const hint = $('#gAutoHint');
+    const hasGemini = S.gemini_key || S.builtin_gemini_key;
+    if (hint) hint.innerHTML = !hasGemini ? '⚠️ Isi <b>Gemini API key</b> dulu di atas agar suara Gemini bisa dipakai.'
+      : on ? `Aktif ✓ — Nexa memakai suara <b>${esc(S.gemini_voice || 'Kore')}</b> untuk semuanya.` : 'Nonaktif — suara diatur manual di bawah.';
+  }
+  $$('.gauto').forEach((c) => c.addEventListener('change', (e) => {
+    save({ gemini_voice_auto: e.target.checked });
+    syncGeminiAuto();
+    toast(e.target.checked ? 'Suara Gemini otomatis aktif ✓' : 'Suara Gemini otomatis dimatikan');
+  }));
+  $('#gVoice').addEventListener('change', (e) => { save({ gemini_voice: e.target.value }); syncGeminiAuto(); toast(`Suara: ${e.target.value} ✓`); });
+  $('#gVoiceNew').addEventListener('click', () => {
+    go('studio');
+    const b = $('[data-sub="voice"]'); if (b) b.click();
+    toast('Rekam/unggah sampel suara lalu tekan Kloning 🧬', 4000);
+  });
+  $('#checkKeys').addEventListener('click', () => { $('#keysResult').innerHTML = '<div class="hint">Mengecek…</div>'; A.checkKeys(); });
+  function renderKeys(d) {
+    const names = { gemini: 'Gemini (AI Studio)', openai: 'OpenAI', fish: 'Fish Audio', tiktok: 'TikTok LIVE' };
+    $('#keysResult').innerHTML = Object.keys(names).map((k) => {
+      const v = d[k] || 'kosong';
+      const ic = v === 'ok' ? '✅' : v === 'kosong' ? '⚪' : '❌';
+      const txt = v === 'ok' ? 'tersambung' : v === 'kosong' ? 'belum ada kunci' : esc(v);
+      return `<div class="hint" style="margin:4px 0">${ic} <b>${names[k]}</b> — ${txt}</div>`;
+    }).join('');
+  }
+  $('#gVoiceTest').addEventListener('click', () => {
+    save(collect($('#page-settings')));
+    toast('Membuat contoh suara…');
+    A.previewVoice('gemini:' + ($('#gVoice').value || 'Kore'), `Halo, aku ${S.assistant_name || 'Nexa'}. Suara ini otomatis dipakai untuk semuanya.`);
+  });
 
   function collect(scope = document) {
     const out = {};
@@ -339,7 +382,7 @@
   function loadVoices() {
     let voices = [];
     try { voices = JSON.parse(A.voices()); } catch (e) { voices = []; }
-    const sel = $('#vVoice'); const cur = sel.value || S.video_voice;
+    const sel = $('#vVoice'); const cur = sel.value || (S.gemini_voice_auto !== false ? 'gemini:' + (S.gemini_voice || 'Kore') : S.video_voice);
     sel.innerHTML = voices.map((v) => `<option value="${esc(v.id)}">${v.cloned ? '🧬 ' : ''}${esc(v.name)}</option>`).join('');
     if (cur && voices.some((v) => v.id === cur)) sel.value = cur;
     $('#voiceList').innerHTML = voices.map((v) => `<div class="voice-item"><span>${v.cloned ? '🧬' : '🔈'} ${esc(v.name)}<br><small class="hint" style="margin:0">${esc(v.id)}</small></span>
@@ -349,10 +392,10 @@
     $$('[data-vtest]').forEach((b) => b.addEventListener('click', () => { toast('Membuat contoh suara…'); A.previewVoice(b.dataset.vtest, `Halo, ini suara ${S.assistant_name || 'Nexa'}. Siap membantu kamu hari ini!`); }));
     $$('[data-vdef]').forEach((b) => b.addEventListener('click', () => {
       const id = b.dataset.vdef, part = { video_voice: id };
-      if (id.startsWith('fish:')) Object.assign(part, { fish_voice: id.slice(5), voice_engine: 'fish' });
-      if (id.startsWith('openai:')) Object.assign(part, { openai_voice: id.slice(7), voice_engine: 'openai' });
-      if (id.startsWith('gemini:')) Object.assign(part, { tts_voice: id.slice(7), voice_engine: 'gemini' });
-      save(part); toast('Jadi suara default video & asisten ★');
+      if (id.startsWith('fish:')) Object.assign(part, { fish_voice: id.slice(5), voice_engine: 'fish', gemini_voice_auto: false });
+      if (id.startsWith('openai:')) Object.assign(part, { openai_voice: id.slice(7), voice_engine: 'openai', gemini_voice_auto: false });
+      if (id.startsWith('gemini:')) Object.assign(part, { tts_voice: id.slice(7), voice_engine: 'gemini', gemini_voice: id.slice(7) });
+      save(part); syncGeminiAuto(); toast('Jadi suara default video & asisten ★');
     }));
     $$('[data-vdel]').forEach((b) => b.addEventListener('click', () => { A.deleteVoice(b.dataset.vdel); loadVoices(); }));
   }
@@ -427,6 +470,7 @@
         case 'tiktok': onTikTok(d); break;
         case 'dictation': if (ev.text) sendChat(ev.text); break;
         case 'toast': toast(d.text || ''); break;
+        case 'keys': renderKeys(d); break;
         case 'busy': toast(d.text || '…'); break;
         case 'image_done':
           $('#imgMake').disabled = false; $('#imgOut').textContent = (d.result || '').replace(/^OK: /, '✓ ');
@@ -453,7 +497,7 @@
 
   // ---------------------------------------------------------------- tiruan untuk pratinjau browser
   function mockBridge() {
-    const st = { gemini_key: '', assistant_name: 'Nexa', wake_words: 'nexa', live_voice: 'Kore', live_idle_sec: 45, tt_rate: 1.05,
+    const st = { gemini_key: '', assistant_name: 'Nexa', wake_words: 'nexa', live_voice: 'Kore', gemini_voice_auto: true, gemini_voice: 'Kore', live_idle_sec: 45, tt_rate: 1.05,
       tt_on_follow: true, tt_on_like: true, tt_on_gift: true, tt_on_share: true, tt_on_guest: true,
       tt_tpl_follow: 'Terima kasih {nama} sudah follow!', tt_tpl_like: 'Makasih {nama} tap-tapnya!', tt_tpl_gift: 'Terima kasih {nama} untuk {jumlah} {hadiah}!',
       tt_tpl_share: 'Makasih {nama} sudah share!', tt_tpl_guest: '{nama} ingin naik live.', tt_tpl_join: 'Halo {nama}!', tt_tpl_chat: '{nama} bilang {komentar}',
@@ -464,6 +508,6 @@
       setWake: noop, sendText: noop, stopAgent: noop, dictate: noop, testVoice: noop, quick: () => 'OK: contoh', apps: () => '[{"name":"YouTube","pkg":"x"},{"name":"WhatsApp","pkg":"y"}]',
       notes: () => '[]', saveNotes: noop, tiktokConnect: () => 'OK', tiktokDisconnect: noop, tiktokTest: noop, tiktokPause: noop, tiktokStats: () => '',
       generateImage: noop, recordStart: () => 'OK', recordStop: noop, openUrl: noop, pickAudio: noop, makeVideo: () => 'OK:x', jobs: () => '[]', cancelJob: noop,
-      gallery: () => '[]', deleteMedia: noop, voices: () => '[{"id":"gemini:Kore","name":"Gemini Kore"}]', deleteVoice: noop, cloneVoice: noop, previewVoice: noop };
+      gallery: () => '[]', deleteMedia: noop, voices: () => '[{"id":"gemini:Kore","name":"Gemini Kore"}]', deleteVoice: noop, cloneVoice: noop, previewVoice: noop, checkKeys: noop };
   }
 })();

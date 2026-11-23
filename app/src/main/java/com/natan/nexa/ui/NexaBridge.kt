@@ -206,7 +206,9 @@ class NexaBridge(private val act: MainActivity) {
     }
 
     // ---- suara & kloning ----
-    private val geminiVoices = listOf("Kore", "Puck", "Aoede", "Charon", "Fenrir", "Leda", "Orus", "Zephyr")
+    private val geminiVoices = listOf("Kore", "Puck", "Aoede", "Charon", "Fenrir", "Leda", "Orus", "Zephyr", "Callirrhoe", "Autonoe",
+        "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar",
+        "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat")
     private val openaiVoices = listOf("coral", "alloy", "nova", "shimmer", "echo", "sage")
 
     @JavascriptInterface fun voices(): String {
@@ -273,6 +275,31 @@ class NexaBridge(private val act: MainActivity) {
         scope.launch {
             val err = try { VoiceOutput(ctx).speakSpec(text, spec); null } catch (e: Exception) { e.message }
             emit("toast", JSONObject().put("text", err?.let { "Gagal: $it" } ?: "Contoh suara selesai"))
+        }
+    }
+
+    /** Cek semua kunci API sekaligus; hasil dikirim sebagai event "keys". */
+    @JavascriptInterface fun checkKeys() {
+        scope.launch {
+            val out = JSONObject()
+            suspend fun test(name: String, key: String, block: () -> Unit) {
+                out.put(name, when {
+                    key.isBlank() -> "kosong"
+                    else -> try { withContext(Dispatchers.IO) { block() }; "ok" } catch (e: Exception) { "gagal: ${e.message?.take(90)}" }
+                })
+            }
+            test("gemini", prefs.geminiApiKey) {
+                Http.get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1",
+                    mapOf("x-goog-api-key" to prefs.geminiApiKey), 20_000)
+            }
+            test("openai", prefs.openaiKey) {
+                Http.get("https://api.openai.com/v1/models", mapOf("Authorization" to "Bearer ${prefs.openaiKey}"), 20_000)
+            }
+            test("fish", prefs.fishKey) {
+                Http.get("https://api.fish.audio/model?page_size=1", mapOf("Authorization" to "Bearer ${prefs.fishKey}"), 20_000)
+            }
+            test("tiktok", prefs.str("tt_api_key")) { }
+            emit("keys", out)
         }
     }
 

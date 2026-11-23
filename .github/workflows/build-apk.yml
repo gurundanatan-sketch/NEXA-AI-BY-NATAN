@@ -45,6 +45,11 @@ jobs:
           NEXA_KEYSTORE_PASSWORD: ${{ secrets.NEXA_KEYSTORE_PASSWORD }}
           NEXA_KEY_ALIAS: ${{ secrets.NEXA_KEY_ALIAS }}
           NEXA_KEY_PASSWORD: ${{ secrets.NEXA_KEY_PASSWORD }}
+          # Kunci API tertanam otomatis (jalankan tools/setup_keys.sh sekali)
+          NEXA_GEMINI_KEY: ${{ secrets.NEXA_GEMINI_KEY }}
+          NEXA_OPENAI_KEY: ${{ secrets.NEXA_OPENAI_KEY }}
+          NEXA_FISH_KEY: ${{ secrets.NEXA_FISH_KEY }}
+          NEXA_TIKTOK_KEY: ${{ secrets.NEXA_TIKTOK_KEY }}
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace
@@ -52,7 +57,7 @@ jobs:
       - name: Ganti nama APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/*.apk out/NEXA-AI-BY-NATAN-v3.0.${{ github.run_number }}.apk
+          cp app/build/outputs/apk/release/*.apk out/NEXA-AI-BY-NATAN-v4.0.${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         with:

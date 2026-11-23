@@ -101,6 +101,42 @@ class FishTts(
     }
 }
 
+/**
+ * Gemini TTS otomatis: mencoba model pilihan dulu, lalu model cadangan bila model itu
+ * tidak tersedia untuk kunci ini. Model yang berhasil diingat untuk panggilan berikutnya.
+ */
+class GeminiAutoTts(private val p: Prefs, private val voice: String) : TtsEngine {
+    companion object {
+        val MODELS = listOf(
+            "gemini-3.8-flash-tts",
+            "gemini-3.1-flash-tts-preview",
+            "gemini-2.5-flash-preview-tts",
+            "gemini-2.5-pro-preview-tts",
+        )
+        @Volatile private var working: String? = null
+    }
+
+    override suspend fun synthesize(text: String): ByteArray {
+        val chosen = p.geminiTtsModel
+        val order = listOfNotNull(working?.takeIf { it == chosen }, chosen) + MODELS
+        var last: Exception? = null
+        for (m in order.distinct()) {
+            try {
+                val audio = GeminiTts(p.geminiApiKey, m, voice, p.str("gemini_style").ifBlank { "hangat, ramah, natural" })
+                    .synthesize(text)
+                working = m
+                return audio
+            } catch (e: Exception) {
+                last = e
+                // Kunci salah / kuota habis: model lain tidak akan membantu.
+                val msg = e.message.orEmpty()
+                if ("API_KEY" in msg || "401" in msg || "403" in msg || "429" in msg) break
+            }
+        }
+        throw last ?: RuntimeException("Gemini TTS gagal")
+    }
+}
+
 /** Membuat mesin suara dari spesifikasi "mesin:id", mis. gemini:Kore, openai:coral, fish:<id>. */
 object Tts {
     fun fromSpec(p: Prefs, spec: String): TtsEngine {
@@ -117,7 +153,7 @@ object Tts {
             }
             else -> {
                 require(p.geminiApiKey.isNotBlank()) { "Kunci Gemini belum diisi di Pengaturan" }
-                GeminiTts(p.geminiApiKey, p.geminiTtsModel, id.ifBlank { p.geminiVoice })
+                GeminiAutoTts(p, id.ifBlank { p.geminiVoice })
             }
         }
     }
@@ -182,7 +218,7 @@ class VoiceOutput(private val context: Context) {
     private val android by lazy { AndroidTts(context) }
 
     private fun engine(p: Prefs, name: String): TtsEngine? = when (name) {
-        "gemini" -> if (p.geminiApiKey.isNotEmpty()) GeminiTts(p.geminiApiKey, p.geminiTtsModel, p.geminiVoice) else null
+        "gemini" -> if (p.geminiApiKey.isNotEmpty()) GeminiAutoTts(p, p.geminiVoice) else null
         "openai" -> if (p.openaiKey.isNotEmpty()) OpenAiTts(p.openaiKey, p.str("openai_tts_model"), p.str("openai_voice")) else null
         "fish" -> if (p.fishKey.isNotEmpty()) FishTts(p.fishKey, p.str("fish_model"), p.str("fish_voice")) else null
         "sovits" -> if (p.sovitsUrl.isNotEmpty() && p.sovitsRefPath.isNotEmpty())

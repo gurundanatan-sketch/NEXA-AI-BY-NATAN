@@ -104,6 +104,21 @@ object Tools {
         .put(fn("tiktok_stats", "Statistik live TikTok saat ini (penonton, follow, like, koin, top gifter)."))
         .put(fn("tiktok_reading", "Nyalakan/jeda pembacaan otomatis event TikTok.",
             JSONObject().put("on", bool("true = baca, false = jeda")), listOf("on")))
+        // --- fitur pendukung ---
+        .put(fn("copy_to_clipboard", "Salin teks ke papan klip.",
+            JSONObject().put("text", str("Teks yang disalin")), listOf("text")))
+        .put(fn("read_clipboard", "Baca isi papan klip (mis. untuk diterjemahkan/diringkas)."))
+        .put(fn("media_control", "Kendalikan musik/video yang sedang diputar.",
+            JSONObject().put("action", choice("Aksi", "play_pause", "next", "previous", "stop")), listOf("action")))
+        .put(fn("navigate", "Buka navigasi peta ke suatu tempat.",
+            JSONObject().put("place", str("Tujuan, mis. Bandara Sultan Hasanuddin"))
+                .put("mode", choice("Kendaraan", "drive", "motor", "walk")), listOf("place")))
+        .put(fn("share_text", "Bagikan teks ke aplikasi lain lewat menu bagikan.",
+            JSONObject().put("text", str("Teks yang dibagikan")), listOf("text")))
+        .put(fn("add_calendar_event", "Tambah jadwal ke Kalender.",
+            JSONObject().put("title", str("Judul acara"))
+                .put("start", str("Waktu mulai, format yyyy-MM-dd HH:mm"))
+                .put("duration_min", int("Durasi menit")), listOf("title", "start")))
         .apply {
             if (forLive) {
                 put(fn("end_conversation", "Akhiri percakapan suara bila pengguna pamit/selesai (mis. 'udah', 'makasih Nexa', 'sampai nanti')."))
