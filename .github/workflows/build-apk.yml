@@ -23,8 +23,6 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
       # Memvalidasi gradle-wrapper.jar (menolak wrapper palsu) + cache Gradle
       - uses: gradle/actions/setup-gradle@v4
 
