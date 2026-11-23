@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HTTPS dipakai untuk Gemini.
+  HTTP biasa (cleartext) diizinkan HANYA supaya HP bisa memanggil server
+  GPT-SoVITS di PC rumah (mis. http://192.168.1.10:9880).
+  Untuk rilis publik, ganti dengan HTTPS dan hapus izin ini.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

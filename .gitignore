@@ -1,0 +1,21 @@
+# Android / Gradle
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+*.jks
+*.keystore
+
+# Server
+server/nexa_output/
+server/logs/
+server/tiktok/node_modules/
+__pycache__/
+*.pyc
+.nexa_env
+.env

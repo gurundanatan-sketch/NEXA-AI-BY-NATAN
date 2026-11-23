@@ -1,0 +1,30 @@
+# Salin ke ~/.nexa_env lalu isi:  cp nexa_env.example ~/.nexa_env && nano ~/.nexa_env
+# JANGAN unggah file berisi kunci asli ke GitHub.
+
+# Token bebas (buat sendiri, panjang & acak). Samakan dengan "Token" di aplikasi NEXA.
+export NEXA_TOKEN="ganti-dengan-token-rahasia-panjang"
+
+# Google AI Studio — https://aistudio.google.com/apikey
+export GEMINI_API_KEY="AIza..."
+
+# OpenAI — transkrip suara asli (subtitle per kata) & suara OpenAI
+export OPENAI_API_KEY="sk-..."
+
+# MiniMax — kloning suara (Speech-02) — https://platform.minimax.io
+export MINIMAX_API_KEY="..."
+# export MINIMAX_GROUP_ID=""            # isi bila akun Anda memerlukannya
+export MINIMAX_MODEL="speech-02-hd"     # atau speech-02-turbo / speech-2.8-hd
+export MINIMAX_LANG="Indonesian"
+
+# Suara default video & /tts
+export DEFAULT_VOICE="gemini:Kore"      # contoh kloning: minimax:NexaSuara1234
+
+# TikTok LIVE bridge (opsional)
+# export EULER_API_KEY=""               # bila koneksi TikTok sering ditolak
+# export TT_SESSION_ID=""               # sessionid akun host (untuk event khusus host)
+
+# GPT-SoVITS (opsional, PC dengan GPU)
+# export SOVITS_URL="http://192.168.1.10:9880"
+# export SOVITS_REF="wavs/ref.wav"
+# export SOVITS_PROMPT="transkrip audio referensi"
+# export SOVITS_LANG="en"

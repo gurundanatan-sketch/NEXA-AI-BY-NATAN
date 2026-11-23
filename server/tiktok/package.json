@@ -1,0 +1,18 @@
+{
+  "name": "nexa-tiktok-bridge",
+  "version": "1.0.0",
+  "description": "Jembatan TikTok LIVE → aplikasi NEXA AI BY NATAN (WebSocket lokal)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "^2.5.0",
+    "ws": "^8.18.0"
+  },
+  "license": "MIT"
+}

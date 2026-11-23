@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NEXA AI BY NATAN</string>
+    <string name="accessibility_label">NEXA – Kontrol Layar</string>
+    <string name="accessibility_description">Mengizinkan NEXA membaca isi layar serta mengetuk, mengetik, dan menggulir sesuai perintah Anda. NEXA hanya bertindak saat Anda memberi perintah.</string>
+    <string name="tile_label">NEXA Live</string>
+</resources>

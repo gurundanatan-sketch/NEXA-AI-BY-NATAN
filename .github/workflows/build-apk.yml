@@ -1,0 +1,61 @@
+name: Build NEXA AI APK
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ "v*" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      KEYSTORE_B64: ${{ secrets.NEXA_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      # Memvalidasi gradle-wrapper.jar (menolak wrapper palsu) + cache Gradle
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Siapkan keystore rilis (opsional, dari Secrets)
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > $RUNNER_TEMP/nexa.jks
+          echo "NEXA_KEYSTORE_FILE=$RUNNER_TEMP/nexa.jks" >> $GITHUB_ENV
+
+      - name: Build APK (debug + release)
+        env:
+          NEXA_KEYSTORE_PASSWORD: ${{ secrets.NEXA_KEYSTORE_PASSWORD }}
+          NEXA_KEY_ALIAS: ${{ secrets.NEXA_KEY_ALIAS }}
+          NEXA_KEY_PASSWORD: ${{ secrets.NEXA_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug assembleRelease --stacktrace
+
+      - name: Ganti nama APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/*.apk   out/NEXA-AI-BY-NATAN-debug.apk
+          cp app/build/outputs/apk/release/*.apk out/NEXA-AI-BY-NATAN-release.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NEXA-AI-BY-NATAN-apk
+          path: out/*.apk
+
+      - name: Rilis GitHub (saat push tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk

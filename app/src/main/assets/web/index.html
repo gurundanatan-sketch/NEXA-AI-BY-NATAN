@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#070b1a">
+<title>NEXA AI BY NATAN</title>
+<link rel="stylesheet" href="css/nexa.css">
+</head>
+<body>
+<div class="bg"></div>
+<div class="app">
+
+  <header class="top">
+    <div class="logo">
+      <div class="logo-mark"><span>N</span></div>
+      <div class="logo-text"><b>NEXA AI</b><small>BY NATAN</small></div>
+    </div>
+    <span id="liveTag" class="tag" style="display:none">● LIVE</span>
+    <button class="icon-btn" data-go="control" aria-label="Pusat kendali">🎛️</button>
+    <button class="icon-btn" data-go="settings" aria-label="Pengaturan">⚙️</button>
+  </header>
+
+  <main id="main">
+
+    <!-- ============================== BERANDA ============================== -->
+    <section class="page active" id="page-home">
+      <div class="orb-wrap">
+        <button class="orb" id="orb" aria-label="Mulai bicara">
+          <div class="ring"></div><div class="wave"></div><div class="wave"></div><div class="wave"></div>
+          <div class="core"></div>
+          <div class="label" id="orbLabel">KETUK</div>
+        </button>
+      </div>
+      <p class="orb-hint" id="orbHint">Ketuk orb untuk ngobrol, atau ucapkan <b>"Nexa"</b></p>
+
+      <div class="card glow">
+        <div class="switch">
+          <div class="t">Panggil dengan suara<small>Ucapkan "<span class="aname">Nexa</span>" kapan saja — tanpa membuka aplikasi</small></div>
+          <label class="toggle"><input type="checkbox" id="wakeToggle"><span></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>⚡ Aksi cepat</h3>
+        <div class="grid g4">
+          <button class="tile" data-quick="flash_on"><i>🔦</i>Senter</button>
+          <button class="tile" data-quick="flash_off"><i>🌑</i>Senter off</button>
+          <button class="tile" data-quick="wifi"><i>📶</i>Wi-Fi</button>
+          <button class="tile" data-quick="bluetooth"><i>🛜</i>Bluetooth</button>
+          <button class="tile" data-quick="volume_panel"><i>🔊</i>Volume</button>
+          <button class="tile" data-quick="device"><i>🔋</i>Info HP</button>
+          <button class="tile" data-quick="notifications"><i>💬</i>Notif</button>
+          <button class="tile" data-quick="screen"><i>👁️</i>Baca layar</button>
+        </div>
+        <pre class="out" id="quickOut" style="display:none"></pre>
+      </div>
+
+      <div class="card">
+        <h3>🛡️ Kesiapan sistem <span class="tag" id="readyTag">…</span></h3>
+        <div class="status-list" id="statusList"></div>
+      </div>
+
+      <div class="card">
+        <h3>🧠 Aktivitas terbaru</h3>
+        <div class="feed" id="homeLog"><div class="empty">Belum ada aktivitas</div></div>
+      </div>
+    </section>
+
+    <!-- ============================== CHAT ============================== -->
+    <section class="page" id="page-chat">
+      <div class="section-title">Ngobrol dengan <span class="aname">Nexa</span></div>
+      <p class="sub">Ketik perintah ("buka YouTube lalu cari lagu santai", "bacain chat WA terbaru"). Saat mode Live aktif, pesan diketik masuk ke percakapan suara.</p>
+      <div class="chips" style="margin-bottom:14px">
+        <button class="chip" data-say="Bacain chat WhatsApp terbaru">💬 Chat WA terbaru</button>
+        <button class="chip" data-say="Di layar ini ada apa?">👁️ Isi layar</button>
+        <button class="chip" data-say="Berita terbaru hari ini apa?">📰 Berita</button>
+        <button class="chip" data-say="Pasang alarm jam 5 pagi">⏰ Alarm</button>
+        <button class="chip" data-say="Info baterai HP">🔋 Baterai</button>
+      </div>
+      <div class="chat" id="chat"></div>
+      <div class="composer">
+        <button class="icon-btn" id="dictate" aria-label="Dikte">🎙️</button>
+        <input type="text" id="chatInput" placeholder="Ketik pesan untuk Nexa…" autocomplete="off">
+        <button class="icon-btn" id="chatSend" aria-label="Kirim">➤</button>
+      </div>
+    </section>
+
+    <!-- ============================== TIKTOK LIVE ============================== -->
+    <section class="page" id="page-tiktok">
+      <div class="section-title">Asisten <span>TikTok LIVE</span></div>
+      <p class="sub">Nexa membacakan follow, tap-tap layar, hadiah, share, dan permintaan naik live dengan kalimat buatanmu.</p>
+
+      <div class="card glow">
+        <h3>📡 Koneksi <span class="tag" id="ttTag">Terputus</span></h3>
+        <div class="row">
+          <input type="text" id="ttUser" placeholder="username TikTok (tanpa @)">
+          <button class="btn sm auto" id="ttConnect">Sambung</button>
+        </div>
+        <div class="row mt">
+          <button class="btn ghost sm" id="ttDisconnect">Putus</button>
+          <button class="btn ghost sm" id="ttPause">⏸ Jeda baca</button>
+        </div>
+        <p class="hint">Butuh <code>server.js</code> berjalan di Termux (lihat Pengaturan → Panduan Termux). Akun harus sedang live.</p>
+      </div>
+
+      <div class="grid g3" style="margin-bottom:14px">
+        <div class="stat c"><b id="sViewers">0</b><small>PENONTON</small></div>
+        <div class="stat v"><b id="sFollows">0</b><small>FOLLOW</small></div>
+        <div class="stat p"><b id="sLikes">0</b><small>LIKE</small></div>
+        <div class="stat a"><b id="sCoins">0</b><small>KOIN</small></div>
+        <div class="stat g"><b id="sShares">0</b><small>SHARE</small></div>
+        <div class="stat"><b id="sGuests">0</b><small>MINTA NAIK</small></div>
+      </div>
+
+      <div class="card">
+        <h3>🏆 Top gifter</h3>
+        <div id="topGifters"><div class="empty">Belum ada hadiah</div></div>
+      </div>
+
+      <div class="card">
+        <h3>🔴 Event live</h3>
+        <div class="feed" id="ttFeed"><div class="empty">Menunggu event…</div></div>
+      </div>
+
+      <div class="card">
+        <h3>🗣️ Kalimat ucapan</h3>
+        <p class="hint" style="margin-top:-4px">Satu kalimat per baris — Nexa memilih acak supaya tidak monoton.</p>
+        <div class="placeholders">
+          <code>{nama}</code><code>{username}</code><code>{hadiah}</code><code>{jumlah}</code><code>{koin}</code><code>{total_koin}</code><code>{like}</code><code>{komentar}</code>
+        </div>
+        <div id="tplList"></div>
+      </div>
+
+      <div class="card">
+        <h3>⚙️ Pengaturan pembacaan</h3>
+        <label class="f">Mesin suara</label>
+        <select data-pref="tt_engine">
+          <option value="android">TTS Android (tercepat, offline)</option>
+          <option value="gemini">Gemini TTS (natural)</option>
+          <option value="server">Server NEXA (MiniMax kloning / OpenAI)</option>
+        </select>
+        <label class="f">Kecepatan bicara: <b id="rateVal">1.05</b>×</label>
+        <input type="range" min="0.6" max="1.8" step="0.05" data-pref="tt_rate">
+        <div class="grid g3 mt">
+          <div><label class="f">Min. koin</label><input type="number" data-pref="tt_min_coins"></div>
+          <div><label class="f">Min. like</label><input type="number" data-pref="tt_like_min"></div>
+          <div><label class="f">Jeda/org (dtk)</label><input type="number" data-pref="tt_cooldown_sec"></div>
+        </div>
+        <div class="switch mt">
+          <div class="t">AI jawab pertanyaan penonton<small>Nexa menjawab komentar berisi pertanyaan (pakai Gemini)</small></div>
+          <label class="toggle"><input type="checkbox" data-pref="tt_ai_answer"><span></span></label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== STUDIO ============================== -->
+    <section class="page" id="page-studio">
+      <div class="section-title">Studio <span>Kreatif</span></div>
+      <div class="seg" id="studioSeg">
+        <button data-sub="video" class="on">🎬 Video</button>
+        <button data-sub="image">🖼️ Gambar</button>
+        <button data-sub="voice">🎙️ Suara</button>
+        <button data-sub="gallery">📁 Galeri</button>
+      </div>
+
+      <!-- VIDEO -->
+      <div class="subpage on" id="sub-video">
+        <div class="card glow">
+          <h3>🎬 Buat video panjang</h3>
+          <div class="seg" id="vSrcSeg">
+            <button data-src="script" class="on">📝 Naskah</button>
+            <button data-src="topic">💡 Topik</button>
+            <button data-src="own">🎤 Suara asli</button>
+          </div>
+          <div id="vScriptBox">
+            <label class="f">Naskah / teks</label>
+            <textarea id="vScript" placeholder="Tempel naskahmu di sini. Nexa memecahnya jadi adegan, membuat visual, dan mengisi suara."></textarea>
+          </div>
+          <div id="vTopicBox" style="display:none">
+            <label class="f">Topik</label>
+            <input type="text" id="vTopic" placeholder="mis. Sejarah Kota Manado dalam 3 menit">
+            <label class="f">Durasi (menit)</label>
+            <input type="number" id="vDur" value="2" min="0.5" step="0.5">
+          </div>
+          <div id="vOwnBox" style="display:none">
+            <p class="hint">Rekam atau unggah narasi dengan <b>suaramu sendiri</b>. Nexa mentranskrip, membuat visual per kalimat, dan menyinkronkan subtitle.</p>
+            <div class="row mt">
+              <button class="btn ghost sm" id="vOwnRec">⏺ Rekam</button>
+              <label class="btn ghost sm" style="margin:0">📂 Pilih file<input type="file" id="vOwnFile" accept="audio/*" hidden></label>
+            </div>
+            <p class="hint" id="vOwnStatus">Belum ada audio</p>
+          </div>
+
+          <div id="vVoiceBox">
+            <label class="f">Suara narator</label>
+            <select id="vVoice"><option value="gemini:Kore">Gemini Kore</option></select>
+            <p class="hint">Suara kloning (MiniMax / Gemini) muncul di sini setelah dibuat di tab <b>Suara</b>.</p>
+          </div>
+
+          <div class="grid g2">
+            <div><label class="f">Visual</label>
+              <select id="vMode"><option value="images">Gambar AI + gerak kamera</option><option value="clips">Klip video AI (mahal)</option></select></div>
+            <div><label class="f">Rasio</label>
+              <select id="vAspect"><option value="9:16">9:16 TikTok/Reels</option><option value="16:9">16:9 YouTube</option><option value="1:1">1:1</option></select></div>
+          </div>
+          <label class="f">Musik latar (opsional, otomatis mengecil saat narasi)</label>
+          <div class="row">
+            <label class="btn ghost sm" style="margin:0">🎵 Pilih musik<input type="file" id="vBgm" accept="audio/*" hidden></label>
+            <span class="hint auto" id="vBgmName" style="margin:0">—</span>
+          </div>
+          <div class="switch mt">
+            <div class="t">Subtitle otomatis<small>Ditanam di video, sinkron per 3–4 kata</small></div>
+            <label class="toggle"><input type="checkbox" id="vSubs" checked><span></span></label>
+          </div>
+          <button class="btn mt" id="vMake">✨ Buat video</button>
+        </div>
+        <div class="card">
+          <h3>⏳ Antrean render <button class="btn ghost sm auto" id="jobsRefresh" style="margin-left:auto">↻</button></h3>
+          <div id="jobs"><div class="empty">Belum ada pekerjaan</div></div>
+        </div>
+      </div>
+
+      <!-- GAMBAR -->
+      <div class="subpage" id="sub-image">
+        <div class="card glow">
+          <h3>🖼️ Gambar realistis</h3>
+          <textarea id="imgPrompt" placeholder="mis. jalanan Manado gaya cyberpunk saat hujan malam hari"></textarea>
+          <div class="switch">
+            <div class="t">Perkaya prompt otomatis<small>Nexa menambah detail fotografi (cahaya, lensa, komposisi)</small></div>
+            <label class="toggle"><input type="checkbox" id="imgEnhance" checked><span></span></label>
+          </div>
+          <button class="btn mt" id="imgMake">🎨 Buat gambar</button>
+          <p class="hint" id="imgOut"></p>
+        </div>
+      </div>
+
+      <!-- SUARA / KLONING -->
+      <div class="subpage" id="sub-voice">
+        <div class="card glow">
+          <h3>🧬 Kloning suara</h3>
+          <label class="f">Nama suara</label>
+          <input type="text" id="cName" placeholder="mis. Suara Natan">
+          <label class="f">Mesin</label>
+          <select id="cEngine">
+            <option value="minimax">MiniMax Speech (cepat, 10 dtk – 5 mnt sampel)</option>
+            <option value="gemini">Gemini Voice Replication (perlu rekaman persetujuan)</option>
+          </select>
+          <label class="f">Sampel suara (jernih, tanpa musik)</label>
+          <div class="row">
+            <button class="btn ghost sm" id="cRec">⏺ Rekam sampel</button>
+            <label class="btn ghost sm" style="margin:0">📂 File<input type="file" id="cFile" accept="audio/*" hidden></label>
+          </div>
+          <p class="hint" id="cSampleStatus">Belum ada sampel</p>
+          <div id="cConsentBox" style="display:none">
+            <label class="f">Rekaman persetujuan (orang yang sama)</label>
+            <p class="hint">Bacakan kalimat persetujuan resmi Google (lihat ai.google.dev → Voice replication).</p>
+            <div class="row mt">
+              <button class="btn ghost sm" id="cConsentRec">⏺ Rekam persetujuan</button>
+              <label class="btn ghost sm" style="margin:0">📂 File<input type="file" id="cConsentFile" accept="audio/*" hidden></label>
+            </div>
+            <p class="hint" id="cConsentStatus">Belum ada</p>
+          </div>
+          <div class="switch mt">
+            <div class="t">Saya pemilik suara ini / punya izin pemiliknya<small>Wajib. Jangan meniru suara orang lain tanpa izin.</small></div>
+            <label class="toggle"><input type="checkbox" id="cAgree"><span></span></label>
+          </div>
+          <button class="btn mt" id="cMake">🧬 Kloning sekarang</button>
+        </div>
+        <div class="card">
+          <h3>🎧 Suara tersedia <button class="btn ghost sm auto" id="voicesRefresh" style="margin-left:auto">↻</button></h3>
+          <div id="voiceList"><div class="empty">Sambungkan server NEXA di Pengaturan</div></div>
+          <p class="hint">Suara kloning MiniMax dihapus otomatis jika tidak dipakai 7 hari — pakai minimal sekali.</p>
+        </div>
+      </div>
+
+      <!-- GALERI -->
+      <div class="subpage" id="sub-gallery">
+        <div class="card">
+          <h3>📁 Hasil di server <button class="btn ghost sm auto" id="galRefresh" style="margin-left:auto">↻</button></h3>
+          <div class="gallery" id="gallery"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== KONTROL ============================== -->
+    <section class="page" id="page-control">
+      <div class="section-title">Pusat <span>Kendali</span></div>
+      <div class="card">
+        <h3>🎚️ Volume media</h3>
+        <input type="range" min="0" max="100" value="50" id="volRange">
+      </div>
+      <div class="card">
+        <h3>⏰ Alarm & timer</h3>
+        <div class="row">
+          <input type="text" id="alarmTime" placeholder="06:30">
+          <button class="btn sm auto" id="alarmSet">Pasang alarm</button>
+        </div>
+        <div class="row mt">
+          <input type="number" id="timerMin" placeholder="menit">
+          <button class="btn sm auto" id="timerSet">Mulai timer</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>📱 Buka aplikasi</h3>
+        <input type="text" id="appSearch" placeholder="Cari aplikasi…">
+        <div class="app-list mt" id="appList"></div>
+      </div>
+      <div class="card">
+        <h3>📝 Catatan Nexa</h3>
+        <div class="row"><input type="text" id="noteInput" placeholder="Tulis catatan…"><button class="btn sm auto" id="noteAdd">＋</button></div>
+        <div id="notes" class="mt"></div>
+        <p class="hint">Bisa juga lewat suara: "Nexa, catat beli kabel data besok".</p>
+      </div>
+    </section>
+
+    <!-- ============================== PENGATURAN ============================== -->
+    <section class="page" id="page-settings">
+      <div class="section-title">Pengaturan</div>
+
+      <div class="card glow">
+        <h3>🔑 Kunci & model Gemini (AI Studio)</h3>
+        <label class="f">Gemini API key</label>
+        <input type="password" data-pref="gemini_key" placeholder="AIza…">
+        <p class="hint">Dapatkan di <a href="#" data-url="https://aistudio.google.com/apikey" style="color:var(--cyan)">aistudio.google.com/apikey</a>. Kunci OpenAI & MiniMax disimpan di Termux (server), bukan di sini.</p>
+        <label class="f">Model agen</label><input type="text" data-pref="agent_model">
+        <label class="f">Model Live (ngobrol real-time)</label><input type="text" data-pref="live_model">
+        <label class="f">Model gambar</label><input type="text" data-pref="image_model">
+      </div>
+
+      <div class="card">
+        <h3>🤖 Asisten</h3>
+        <label class="f">Nama asisten (dipakai untuk memanggil)</label><input type="text" data-pref="assistant_name">
+        <label class="f">Variasi ucapan nama (pisahkan koma)</label><input type="text" data-pref="wake_words">
+        <label class="f">Suara Live</label>
+        <select data-pref="live_voice">
+          <option>Kore</option><option>Puck</option><option>Aoede</option><option>Charon</option>
+          <option>Fenrir</option><option>Leda</option><option>Orus</option><option>Zephyr</option>
+        </select>
+        <label class="f">Tutup otomatis bila diam (detik, 0 = tidak)</label><input type="number" data-pref="live_idle_sec">
+        <div class="switch mt"><div class="t">Boleh menyela Nexa<small>Matikan bila Nexa memotong suaranya sendiri</small></div>
+          <label class="toggle"><input type="checkbox" data-pref="live_barge_in"><span></span></label></div>
+        <div class="switch"><div class="t">Bisukan bunyi bip pendengar<small>Saat mode panggil-suara aktif</small></div>
+          <label class="toggle"><input type="checkbox" data-pref="wake_mute_beep"><span></span></label></div>
+      </div>
+
+      <div class="card">
+        <h3>🔈 Suara mode perintah</h3>
+        <label class="f">Mesin</label>
+        <select data-pref="voice_engine">
+          <option value="gemini">Gemini TTS</option>
+          <option value="server">Server NEXA (MiniMax/OpenAI/kloning)</option>
+          <option value="android">TTS Android (offline)</option>
+          <option value="sovits">GPT-SoVITS langsung</option>
+        </select>
+        <label class="f">Suara Gemini TTS (Kore / voice_…)</label><input type="text" data-pref="tts_voice">
+        <label class="f">Suara server (mis. minimax:NexaSuara1234)</label><input type="text" data-pref="server_voice">
+        <label class="f">Suara default video</label><input type="text" data-pref="video_voice">
+        <button class="btn ghost mt" id="testVoice">▶ Tes suara</button>
+      </div>
+
+      <div class="card">
+        <h3>🖥️ Server NEXA (Termux)</h3>
+        <label class="f">URL server media</label><input type="url" data-pref="backend_url">
+        <label class="f">Token (NEXA_TOKEN)</label><input type="password" data-pref="backend_token">
+        <label class="f">URL TikTok bridge (server.js)</label><input type="url" data-pref="tt_bridge">
+        <button class="btn ghost mt" id="pingServer">📶 Tes koneksi server</button>
+        <pre class="out" id="pingOut" style="display:none"></pre>
+      </div>
+
+      <div class="card">
+        <h3>🛡️ Izin & sistem</h3>
+        <div class="grid g2">
+          <button class="btn ghost sm" data-open="accessibility">Aksesibilitas</button>
+          <button class="btn ghost sm" data-open="notifications">Akses notifikasi</button>
+          <button class="btn ghost sm" id="permBtn">Mikrofon & telepon</button>
+          <button class="btn ghost sm" data-open="battery">Abaikan hemat baterai</button>
+          <button class="btn ghost sm" data-open="assistant">Asisten default</button>
+          <button class="btn ghost sm" data-open="app">Info aplikasi</button>
+        </div>
+        <p class="hint">Tambahkan tombol <b>NEXA Live</b> ke Pengaturan Cepat (tarik bilah notifikasi → edit) untuk memanggil Nexa dari mana saja.</p>
+      </div>
+
+      <div class="card">
+        <h3>📘 Panduan Termux</h3>
+        <pre class="out">pkg install -y git python nodejs ffmpeg
+git clone https://github.com/gurundanatan-sketch/NEXA-AI-BY-NATAN
+cd NEXA-AI-BY-NATAN/server
+bash setup_termux.sh      # sekali saja
+bash start_nexa.sh        # setiap mau pakai</pre>
+      </div>
+
+      <button class="btn" id="saveSettings">💾 Simpan pengaturan</button>
+      <p class="hint" style="text-align:center;margin:14px 0" id="verText">NEXA AI BY NATAN</p>
+    </section>
+  </main>
+
+  <nav class="bottom" id="nav">
+    <button data-go="home" class="on"><i>🏠</i>Beranda</button>
+    <button data-go="chat"><i>💬</i>Chat</button>
+    <button data-go="live" class="center"><i>🎙️</i>Live</button>
+    <button data-go="tiktok"><i>📺</i>TikTok</button>
+    <button data-go="studio"><i>🎬</i>Studio</button>
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="js/app.js"></script>
+</body>
+</html>

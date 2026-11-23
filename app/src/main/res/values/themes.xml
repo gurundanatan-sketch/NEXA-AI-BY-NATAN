@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Nexa" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@color/nexa_bg</item>
+        <item name="android:statusBarColor">@color/nexa_bg</item>
+        <item name="android:navigationBarColor">@color/nexa_bg</item>
+        <item name="colorPrimary">@color/nexa_cyan</item>
+        <item name="colorSecondary">@color/nexa_violet</item>
+    </style>
+</resources>
