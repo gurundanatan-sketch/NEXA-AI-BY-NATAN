@@ -7,6 +7,7 @@ import com.natan.nexa.live.LiveVoiceService
 import com.natan.nexa.media.MediaClient
 import com.natan.nexa.notify.NexaNotificationListener
 import com.natan.nexa.phone.CallController
+import com.natan.nexa.studio.VideoJobs
 import com.natan.nexa.tiktok.TikTokLiveManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -126,21 +127,16 @@ class ToolExecutor(context: Context, private val log: (String) -> Unit) {
             "google_search" -> media.webSearch(a.getString("query"))
             "generate_image" -> { log("Membuat gambar…"); media.generateImage(a.getString("prompt"), true) }
             "make_video" -> {
-                // Video bisa lama → latar belakang, jangan tahan percakapan.
+                // Video dibuat di dalam aplikasi (latar belakang); pengguna diberi tahu saat selesai.
                 val req = JSONObject()
                     .put("mode", a.optString("mode", "images"))
-                    .put("voice", a.optString("voice", prefs.str("video_voice")).ifBlank { "gemini:Kore" })
+                    .put("voice", a.optString("voice").ifBlank { prefs.str("video_voice") })
                     .put("aspect", a.optString("aspect", "9:16"))
                     .put("duration_min", a.optDouble("duration_min", 1.0))
                 if (a.optString("script").isNotBlank()) req.put("script", a.getString("script"))
                 else req.put("topic", a.optString("topic"))
-                background.launch {
-                    val r = try { media.makeVideo(req) { log("Video: $it") } } catch (e: Exception) { "GAGAL: ${e.message}" }
-                    log("Video: $r")
-                    onBackgroundResult?.invoke(
-                        if (r.startsWith("OK")) "Videonya sudah jadi dan tersimpan di Galeri." else "Pembuatan video gagal. $r")
-                }
-                "OK: video sedang dibuat di server (bisa beberapa menit). Pengguna akan diberi tahu saat selesai."
+                VideoJobs.start(app, req)
+                "OK: video sedang dibuat (bisa beberapa menit). Pengguna akan diberi tahu saat selesai."
             }
 
             // --- percakapan ---

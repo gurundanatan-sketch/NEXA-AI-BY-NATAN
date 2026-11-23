@@ -38,6 +38,10 @@ object AgentRunner {
             announce("Ada telepon masuk dari $caller. Mau diangkat atau ditolak?")
         }
         ToolExecutor.onBackgroundResult = { msg -> announce(msg) }
+        com.natan.nexa.studio.VideoJobs.onFinished = { job ->
+            announce(if (job.optString("status") == "done") "Videonya sudah jadi dan tersimpan di Galeri."
+            else "Pembuatan video gagal. ${job.optString("message").take(120)}")
+        }
     }
 
     /** Umumkan lewat mode Live bila aktif, kalau tidak lewat TTS biasa. */

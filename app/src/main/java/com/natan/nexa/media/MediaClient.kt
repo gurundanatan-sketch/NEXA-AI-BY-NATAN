@@ -17,7 +17,7 @@ import java.net.URL
 
 /**
  * - generateImage(): langsung dari HP ke Gemini (Nano Banana 2, gemini-3.1-flash-image)
- * - makeVideo(): lewat server Nexa (folder server/) yang merakit naskah → video MP4
+ * - Video dibuat di dalam aplikasi (studio/VideoJobs.kt)
  * - webSearch(): Google Search grounding untuk info terkini
  * Hasil gambar/video disimpan ke Galeri (Pictures/Nexa, Movies/Nexa).
  */
@@ -31,6 +31,27 @@ class MediaClient(
 ) {
     companion object {
         private const val API = "https://generativelanguage.googleapis.com/v1beta"
+
+        /** Simpan ke Galeri (Pictures/NEXA atau Movies/NEXA). */
+        fun saveToGallery(context: Context, bytes: ByteArray, name: String, mime: String, isVideo: Boolean) {
+            if (Build.VERSION.SDK_INT >= 29) {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                    put(MediaStore.MediaColumns.RELATIVE_PATH,
+                        (if (isVideo) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES) + "/NEXA")
+                }
+                val collection = if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                val uri = context.contentResolver.insert(collection, values)
+                    ?: throw RuntimeException("Tidak bisa menyimpan ke Galeri")
+                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+            } else {
+                // Android 8–9: simpan di folder aplikasi
+                val dir = context.getExternalFilesDir(if (isVideo) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES)
+                File(dir, name).writeBytes(bytes)
+            }
+        }
     }
 
     // ------------------------------------------------------------------ SEARCH
@@ -63,7 +84,10 @@ class MediaClient(
             ?: return@withContext "GAGAL: model tidak mengembalikan gambar"
         val ext = if (mime.contains("jpeg")) "jpg" else "png"
         val name = "nexa_${System.currentTimeMillis()}.$ext"
-        saveToGallery(Base64.decode(b64, Base64.DEFAULT), name, mime, isVideo = false)
+        val bytes = Base64.decode(b64, Base64.DEFAULT)
+        saveToGallery(bytes, name, mime, isVideo = false)
+        // salinan untuk Galeri di dalam aplikasi (Studio → Galeri)
+        File(File(context.filesDir, "nexa_media").apply { mkdirs() }, name).writeBytes(bytes)
         "OK: gambar disimpan di Galeri (Pictures/NEXA/$name)"
     }
 
@@ -77,40 +101,6 @@ class MediaClient(
         val parts = resp.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts")
         (0 until parts.length()).joinToString(" ") { parts.getJSONObject(it).optString("text") }.trim().ifBlank { p }
     } catch (e: Exception) { p }
-
-    // ------------------------------------------------------------------ VIDEO
-    /**
-     * req (lihat server/nexa_server.py): {script | topic, duration_min, mode: images|clips,
-     *  voice: "gemini:Kore" | "minimax:<id>" | "openai:coral" | "own", own_audio_id, bgm_id, aspect, subtitles}
-     */
-    suspend fun makeVideo(req: JSONObject, onProgress: (String) -> Unit): String =
-        withContext(Dispatchers.IO) {
-            if (backendUrl.isBlank()) return@withContext "GAGAL: URL server NEXA belum diisi"
-            val headers = mapOf("X-Nexa-Token" to backendToken)
-            val start = JSONObject(String(http("$backendUrl/video", req, headers)))
-            val jobId = start.optString("job_id").ifEmpty { return@withContext "GAGAL: ${start.optString("error", start.toString())}" }
-
-            var last = ""
-            repeat(360) {                         // maks ±60 menit
-                delay(10_000)
-                val st = JSONObject(String(httpGet("$backendUrl/jobs/$jobId", headers)))
-                val msg = st.optString("message")
-                if (msg != last) { onProgress("${st.optInt("progress")}% · $msg"); last = msg }
-                when (st.optString("status")) {
-                    "done" -> return@withContext saveFromServer(st.getString("file"))
-                    "error" -> return@withContext "GAGAL: $msg"
-                }
-            }
-            "GAGAL: video terlalu lama, cek server"
-        }
-
-    /** Unduh file hasil dari server lalu simpan ke Galeri HP. */
-    fun saveFromServer(file: String): String {
-        val bytes = httpGet("$backendUrl/files/$file", mapOf("X-Nexa-Token" to backendToken))
-        val isVideo = file.endsWith(".mp4")
-        saveToGallery(bytes, file, if (isVideo) "video/mp4" else "image/png", isVideo)
-        return "OK: tersimpan di Galeri (${if (isVideo) "Movies" else "Pictures"}/NEXA/$file)"
-    }
 
     // ------------------------------------------------------------------ HELPERS
     /** Cari konten terakhir bertipe [type] di steps[].content[] (format Interactions API). */
@@ -131,25 +121,8 @@ class MediaClient(
         return found
     }
 
-    private fun saveToGallery(bytes: ByteArray, name: String, mime: String, isVideo: Boolean) {
-        if (Build.VERSION.SDK_INT >= 29) {
-            val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-                put(MediaStore.MediaColumns.MIME_TYPE, mime)
-                put(MediaStore.MediaColumns.RELATIVE_PATH,
-                    (if (isVideo) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES) + "/NEXA")
-            }
-            val collection = if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            val uri = context.contentResolver.insert(collection, values)
-                ?: throw RuntimeException("Tidak bisa menyimpan ke Galeri")
-            context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-        } else {
-            // Android 8–9: simpan di folder aplikasi
-            val dir = context.getExternalFilesDir(if (isVideo) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES)
-            File(dir, name).writeBytes(bytes)
-        }
-    }
+    private fun saveToGallery(bytes: ByteArray, name: String, mime: String, isVideo: Boolean) =
+        saveToGallery(context, bytes, name, mime, isVideo)
 
     private fun http(url: String, body: JSONObject, headers: Map<String, String>): ByteArray {
         val c = (URL(url).openConnection() as HttpURLConnection).apply {

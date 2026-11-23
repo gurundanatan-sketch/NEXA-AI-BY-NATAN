@@ -9,6 +9,7 @@
     <!-- Berjalan di latar belakang (Live & wake word "Nexa") -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -102,6 +103,12 @@
             android:name=".wake.WakeWordService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- Render video di dalam aplikasi -->
+        <service
+            android:name=".studio.StudioService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Tombol Pengaturan Cepat -->
         <service

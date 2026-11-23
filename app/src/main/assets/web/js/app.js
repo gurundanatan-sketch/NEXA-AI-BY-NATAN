@@ -257,23 +257,7 @@
       : '<div class="empty">Belum ada hadiah</div>';
   }
 
-  // ---------------------------------------------------------------- server NEXA (fetch)
-  function srv() { return (S.backend_url || 'http://127.0.0.1:5000').replace(/\/$/, ''); }
-  async function api(path, opt = {}) {
-    const headers = Object.assign({ 'X-Nexa-Token': S.backend_token || '' }, opt.json ? { 'Content-Type': 'application/json' } : {});
-    const r = await fetch(srv() + path, { method: opt.method || (opt.json || opt.form ? 'POST' : 'GET'), headers, body: opt.json ? JSON.stringify(opt.json) : opt.form });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-    return data;
-  }
-  const fileUrl = (name) => `${srv()}/files/${encodeURIComponent(name)}?token=${encodeURIComponent(S.backend_token || '')}`;
-
-  async function uploadFile(file) {
-    const fd = new FormData(); fd.append('file', file);
-    return (await api('/upload', { form: fd })).file_id;
-  }
-
-  // ---------------------------------------------------------------- Studio: tab
+  // ---------------------------------------------------------------- Studio: tab (semua diproses di HP)
   $$('#studioSeg button').forEach((b) => b.addEventListener('click', () => {
     $$('#studioSeg button').forEach((x) => x.classList.toggle('on', x === b));
     $$('#page-studio .subpage').forEach((s) => s.classList.toggle('on', s.id === 'sub-' + b.dataset.sub));
@@ -291,117 +275,96 @@
     $('#vVoiceBox').style.display = vSrc === 'own' ? 'none' : '';
   }));
 
-  // rekaman (Kotlin MediaRecorder → upload → event "uploaded")
-  function recToggle(btn, purpose, statusEl) {
+  // rekaman (Kotlin MediaRecorder) & pilih file → event "uploaded" {purpose, path}
+  const STATUS_EL = { own: '#vOwnStatus', sample: '#cSampleStatus', consent: '#cConsentStatus', bgm: '#vBgmName' };
+  function recToggle(btn, purpose) {
     if (recording === purpose) {
       A.recordStop(purpose); recording = null;
-      btn.innerHTML = '⏺ Rekam'; $(statusEl).textContent = 'Mengunggah…';
+      btn.innerHTML = '⏺ Rekam';
     } else {
       if (recording) return toast('Sedang merekam yang lain');
       const r = A.recordStart();
       if (!r.startsWith('OK')) return toast(r);
       recording = purpose;
-      btn.innerHTML = '<span class="rec"></span>Stop'; $(statusEl).textContent = 'Merekam… bicara dengan jelas';
+      btn.innerHTML = '<span class="rec"></span>Stop'; $(STATUS_EL[purpose]).textContent = 'Merekam… bicara dengan jelas';
     }
   }
-  $('#vOwnRec').addEventListener('click', (e) => recToggle(e.currentTarget, 'own', '#vOwnStatus'));
-  $('#cRec').addEventListener('click', (e) => recToggle(e.currentTarget, 'sample', '#cSampleStatus'));
-  $('#cConsentRec').addEventListener('click', (e) => recToggle(e.currentTarget, 'consent', '#cConsentStatus'));
-
-  async function pickUpload(input, key, statusEl) {
-    const f = input.files[0]; if (!f) return;
-    $(statusEl).textContent = 'Mengunggah ' + f.name + '…';
-    try { upl[key] = await uploadFile(f); $(statusEl).textContent = '✓ ' + f.name; }
-    catch (e) { $(statusEl).textContent = 'Gagal: ' + e.message; }
-  }
-  $('#vOwnFile').addEventListener('change', (e) => pickUpload(e.target, 'own', '#vOwnStatus'));
-  $('#cFile').addEventListener('change', (e) => pickUpload(e.target, 'sample', '#cSampleStatus'));
-  $('#cConsentFile').addEventListener('change', (e) => pickUpload(e.target, 'consent', '#cConsentStatus'));
-  $('#vBgm').addEventListener('change', (e) => pickUpload(e.target, 'bgm', '#vBgmName'));
+  $('#vOwnRec').addEventListener('click', (e) => recToggle(e.currentTarget, 'own'));
+  $('#cRec').addEventListener('click', (e) => recToggle(e.currentTarget, 'sample'));
+  $('#cConsentRec').addEventListener('click', (e) => recToggle(e.currentTarget, 'consent'));
+  $('#vOwnFile').addEventListener('click', () => A.pickAudio('own'));
+  $('#cFile').addEventListener('click', () => A.pickAudio('sample'));
+  $('#cConsentFile').addEventListener('click', () => A.pickAudio('consent'));
+  $('#vBgm').addEventListener('click', () => A.pickAudio('bgm'));
   $('#cEngine').addEventListener('change', (e) => ($('#cConsentBox').style.display = e.target.value === 'gemini' ? '' : 'none'));
 
   // ---------------------------------------------------------------- Studio: video
-  $('#vMake').addEventListener('click', async () => {
-    const req = { mode: $('#vMode').value, aspect: $('#vAspect').value, subtitles: $('#vSubs').checked, burn_subs: true };
+  $('#vMake').addEventListener('click', () => {
+    const req = { mode: $('#vMode').value, aspect: $('#vAspect').value, subtitles: $('#vSubs').checked };
     if (vSrc === 'script') { req.script = $('#vScript').value.trim(); if (!req.script) return toast('Naskah masih kosong'); }
     if (vSrc === 'topic') { req.topic = $('#vTopic').value.trim(); req.duration_min = Number($('#vDur').value || 1); if (!req.topic) return toast('Isi topik dulu'); }
-    if (vSrc === 'own') { if (!upl.own) return toast('Rekam/pilih audio suara asli dulu'); req.voice = 'own'; req.own_audio_id = upl.own; }
+    if (vSrc === 'own') { if (!upl.own) return toast('Rekam/pilih audio suara asli dulu'); req.voice = 'own'; req.own_audio = upl.own; }
     else req.voice = $('#vVoice').value;
-    if (upl.bgm) req.bgm_id = upl.bgm;
-    const btn = $('#vMake'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Mengirim…';
-    try { await api('/video', { json: req }); toast('Video masuk antrean render 🎬'); loadJobs(); }
-    catch (e) { toast('Gagal: ' + e.message, 4000); }
-    btn.disabled = false; btn.innerHTML = '✨ Buat video';
+    if (upl.bgm) req.bgm = upl.bgm;
+    const r = A.makeVideo(JSON.stringify(req));
+    if (r.startsWith('OK')) { toast('Video mulai dibuat 🎬 — boleh tinggalkan aplikasi'); loadJobs(); }
+    else toast(r, 4000);
   });
 
-  let jobTimer = null;
-  async function loadJobs() {
-    try {
-      const { jobs } = await api('/jobs');
-      const box = $('#jobs');
-      box.innerHTML = jobs.length ? '' : '<div class="empty">Belum ada pekerjaan</div>';
-      jobs.forEach((j) => {
-        const el = document.createElement('div');
-        el.className = 'job';
-        const st = j.status === 'done' ? '<span class="tag ok">SELESAI</span>' : j.status === 'error' ? '<span class="tag warn">GAGAL</span>' : '<span class="spinner"></span>';
-        el.innerHTML = `<div class="row"><b style="flex:1">${esc(j.title)}</b>${st}</div>
-          <div class="hint">${esc(j.message)}${j.duration ? ' · ' + j.duration + ' dtk' : ''}</div>
-          ${j.status === 'running' ? `<div class="progress"><i style="width:${j.progress || 0}%"></i></div>` : ''}
-          ${j.status === 'done' ? `<div class="row mt"><button class="btn sm" data-save="${esc(j.file)}">💾 Simpan ke Galeri</button><button class="btn ghost sm" data-play="${esc(j.file)}">▶ Putar</button></div>` : ''}`;
-        box.appendChild(el);
-      });
-      $$('[data-save]', box).forEach((b) => b.addEventListener('click', () => { A.saveFromServer(b.dataset.save); toast('Menyimpan…'); }));
-      $$('[data-play]', box).forEach((b) => b.addEventListener('click', () => A.openUrl(fileUrl(b.dataset.play))));
-      clearTimeout(jobTimer);
-      if (jobs.some((j) => j.status === 'running')) jobTimer = setTimeout(loadJobs, 5000);
-    } catch (e) {
-      $('#jobs').innerHTML = `<div class="empty">Server belum tersambung (${esc(e.message)})</div>`;
-    }
+  function renderJob(j) {
+    const st = j.status === 'done' ? '<span class="tag ok">SELESAI</span>' : j.status === 'error' ? '<span class="tag warn">GAGAL</span>' : '<span class="spinner"></span>';
+    return `<div class="job" data-job="${esc(j.id)}"><div class="row"><b style="flex:1">${esc(j.title)}</b>${st}</div>
+      <div class="hint">${esc(j.message)}${j.duration ? ' · ' + j.duration + ' dtk' : ''}</div>
+      ${j.status === 'running' ? `<div class="progress"><i style="width:${j.progress || 0}%"></i></div><div class="row mt"><button class="btn ghost sm" data-cancel="${esc(j.id)}">✕ Batalkan</button></div>` : ''}
+      ${j.status === 'done' ? `<video src="${mediaUrl(j.file)}" controls playsinline preload="metadata" style="width:100%;border-radius:12px;margin-top:10px;max-height:420px;background:#000"></video>` : ''}</div>`;
+  }
+  function loadJobs() {
+    let jobs = [];
+    try { jobs = JSON.parse(A.jobs()); } catch (e) { jobs = []; }
+    const box = $('#jobs');
+    box.innerHTML = jobs.length ? jobs.map(renderJob).join('') : '<div class="empty">Belum ada pekerjaan</div>';
+    $$('[data-cancel]', box).forEach((b) => b.addEventListener('click', () => { A.cancelJob(b.dataset.cancel); toast('Dibatalkan'); }));
+  }
+  function onJob(j) {
+    const el = document.querySelector(`[data-job="${j.id}"]`);
+    if (!el) return loadJobs();
+    if (j.status !== 'running') return loadJobs();
+    const bar = el.querySelector('.progress i'); if (bar) bar.style.width = (j.progress || 0) + '%';
+    const h = el.querySelector('.hint'); if (h) h.textContent = j.message || '';
   }
   $('#jobsRefresh').addEventListener('click', loadJobs);
+  const mediaUrl = (name) => '/media/' + encodeURIComponent(name);
 
   // ---------------------------------------------------------------- Studio: suara
-  async function loadVoices() {
-    try {
-      const { voices } = await api('/voices');
-      const sel = $('#vVoice'); const cur = sel.value || S.video_voice;
-      sel.innerHTML = voices.map((v) => `<option value="${esc(v.id)}">${v.cloned ? '🧬 ' : ''}${esc(v.name)}</option>`).join('');
-      if (cur && voices.some((v) => v.id === cur)) sel.value = cur;
-      $('#voiceList').innerHTML = voices.map((v) => `<div class="voice-item"><span>${v.cloned ? '🧬' : '🔈'} ${esc(v.name)}<br><small class="hint" style="margin:0">${esc(v.id)}</small></span>
-        <button class="btn ghost sm auto" data-vtest="${esc(v.id)}">▶</button>
-        <button class="btn ghost sm auto" data-vdef="${esc(v.id)}">★</button>
-        ${v.cloned ? `<button class="btn ghost sm auto" data-vdel="${esc(v.id)}">🗑</button>` : ''}</div>`).join('');
-      $$('[data-vtest]').forEach((b) => b.addEventListener('click', () => testServerVoice(b.dataset.vtest)));
-      $$('[data-vdef]').forEach((b) => b.addEventListener('click', () => { save({ video_voice: b.dataset.vdef, server_voice: b.dataset.vdef }); toast('Jadi suara default video & server ★'); }));
-      $$('[data-vdel]').forEach((b) => b.addEventListener('click', async () => { await api('/voices/' + encodeURIComponent(b.dataset.vdel), { method: 'DELETE' }); loadVoices(); }));
-    } catch (e) {
-      $('#voiceList').innerHTML = `<div class="empty">Server belum tersambung (${esc(e.message)})</div>`;
-    }
+  function loadVoices() {
+    let voices = [];
+    try { voices = JSON.parse(A.voices()); } catch (e) { voices = []; }
+    const sel = $('#vVoice'); const cur = sel.value || S.video_voice;
+    sel.innerHTML = voices.map((v) => `<option value="${esc(v.id)}">${v.cloned ? '🧬 ' : ''}${esc(v.name)}</option>`).join('');
+    if (cur && voices.some((v) => v.id === cur)) sel.value = cur;
+    $('#voiceList').innerHTML = voices.map((v) => `<div class="voice-item"><span>${v.cloned ? '🧬' : '🔈'} ${esc(v.name)}<br><small class="hint" style="margin:0">${esc(v.id)}</small></span>
+      <button class="btn ghost sm auto" data-vtest="${esc(v.id)}">▶</button>
+      <button class="btn ghost sm auto" data-vdef="${esc(v.id)}">★</button>
+      ${v.cloned ? `<button class="btn ghost sm auto" data-vdel="${esc(v.id)}">🗑</button>` : ''}</div>`).join('') || '<div class="empty">Belum ada suara</div>';
+    $$('[data-vtest]').forEach((b) => b.addEventListener('click', () => { toast('Membuat contoh suara…'); A.previewVoice(b.dataset.vtest, `Halo, ini suara ${S.assistant_name || 'Nexa'}. Siap membantu kamu hari ini!`); }));
+    $$('[data-vdef]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.dataset.vdef, part = { video_voice: id };
+      if (id.startsWith('fish:')) Object.assign(part, { fish_voice: id.slice(5), voice_engine: 'fish' });
+      if (id.startsWith('openai:')) Object.assign(part, { openai_voice: id.slice(7), voice_engine: 'openai' });
+      if (id.startsWith('gemini:')) Object.assign(part, { tts_voice: id.slice(7), voice_engine: 'gemini' });
+      save(part); toast('Jadi suara default video & asisten ★');
+    }));
+    $$('[data-vdel]').forEach((b) => b.addEventListener('click', () => { A.deleteVoice(b.dataset.vdel); loadVoices(); }));
   }
   $('#voicesRefresh').addEventListener('click', loadVoices);
 
-  async function testServerVoice(id) {
-    try {
-      toast('Membuat contoh suara…');
-      const r = await fetch(srv() + '/tts', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Nexa-Token': S.backend_token || '' },
-        body: JSON.stringify({ text: `Halo, ini suara ${S.assistant_name || 'Nexa'}. Siap membantu kamu hari ini!`, voice: id }) });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
-      new Audio(URL.createObjectURL(await r.blob())).play();
-    } catch (e) { toast('Gagal: ' + e.message, 4000); }
-  }
-
-  $('#cMake').addEventListener('click', async () => {
+  $('#cMake').addEventListener('click', () => {
     if (!$('#cAgree').checked) return toast('Centang pernyataan izin pemilik suara dulu');
     if (!upl.sample) return toast('Rekam atau pilih sampel suara dulu');
     const engine = $('#cEngine').value;
     if (engine === 'gemini' && !upl.consent) return toast('Gemini butuh rekaman persetujuan');
-    const fd = new FormData();
-    fd.append('name', $('#cName').value || 'Suara Saya'); fd.append('engine', engine); fd.append('agree', '1');
-    fd.append('sample_id', upl.sample); if (upl.consent) fd.append('consent_id', upl.consent);
     const btn = $('#cMake'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Mengkloning…';
-    try { const r = await api('/voices/clone', { form: fd }); toast('Suara siap: ' + r.name + ' 🧬', 4000); loadVoices(); }
-    catch (e) { toast('Gagal: ' + e.message, 5000); }
-    btn.disabled = false; btn.innerHTML = '🧬 Kloning sekarang';
+    A.cloneVoice(JSON.stringify({ name: $('#cName').value || 'Suara Saya', engine, sample: upl.sample, consent: upl.consent || '', agree: true }));
   });
 
   // ---------------------------------------------------------------- Studio: gambar & galeri
@@ -411,15 +374,14 @@
     A.generateImage(p, $('#imgEnhance').checked);
   });
 
-  async function loadGallery() {
-    try {
-      const { items } = await api('/gallery');
-      $('#gallery').innerHTML = items.length ? items.map((it) => `<div class="it">${it.type === 'video'
-        ? `<video src="${fileUrl(it.file)}" preload="metadata" controls playsinline></video>`
-        : `<img src="${fileUrl(it.file)}" loading="lazy">`}<button class="btn sm" data-save="${esc(it.file)}">💾</button></div>`).join('')
-        : '<div class="empty" style="grid-column:1/-1">Belum ada hasil</div>';
-      $$('#gallery [data-save]').forEach((b) => b.addEventListener('click', () => { A.saveFromServer(b.dataset.save); toast('Menyimpan ke Galeri…'); }));
-    } catch (e) { $('#gallery').innerHTML = `<div class="empty" style="grid-column:1/-1">Server belum tersambung (${esc(e.message)})</div>`; }
+  function loadGallery() {
+    let items = [];
+    try { items = JSON.parse(A.gallery()); } catch (e) { items = []; }
+    $('#gallery').innerHTML = items.length ? items.map((it) => `<div class="it">${it.type === 'video'
+      ? `<video src="${mediaUrl(it.file)}" preload="metadata" controls playsinline></video>`
+      : `<img src="${mediaUrl(it.file)}" loading="lazy">`}<button class="btn ghost sm" data-mdel="${esc(it.file)}">🗑</button></div>`).join('')
+      : '<div class="empty" style="grid-column:1/-1">Belum ada hasil</div>';
+    $$('#gallery [data-mdel]').forEach((b) => b.addEventListener('click', () => { A.deleteMedia(b.dataset.mdel); loadGallery(); }));
   }
   $('#galRefresh').addEventListener('click', loadGallery);
 
@@ -453,17 +415,6 @@
 
   // ---------------------------------------------------------------- Pengaturan: tes
   $('#testVoice').addEventListener('click', () => { save(collect($('#page-settings'))); A.testVoice(`Halo, aku ${S.assistant_name || 'Nexa'}. Ada yang bisa kubantu?`, ''); });
-  $('#pingServer').addEventListener('click', async () => {
-    save(collect($('#page-settings')));
-    const out = $('#pingOut'); out.style.display = ''; out.textContent = 'Mengecek…';
-    const lines = [];
-    try { const r = await fetch(srv() + '/health'); lines.push('Server media: ' + JSON.stringify(await r.json())); }
-    catch (e) { lines.push('Server media: TIDAK TERJANGKAU (' + e.message + ')'); }
-    try { const u = (S.tt_bridge || '').replace(/^ws/, 'http'); const r = await fetch(u + '/health'); lines.push('TikTok bridge: ' + JSON.stringify(await r.json())); }
-    catch (e) { lines.push('TikTok bridge: TIDAK TERJANGKAU (' + e.message + ')'); }
-    out.textContent = lines.join('\n');
-  });
-
   // ---------------------------------------------------------------- event dari Kotlin
   window.NEXA = {
     onEvent(raw) {
@@ -480,12 +431,15 @@
         case 'image_done':
           $('#imgMake').disabled = false; $('#imgOut').textContent = (d.result || '').replace(/^OK: /, '✓ ');
           toast((d.result || '').startsWith('OK') ? 'Gambar tersimpan di Galeri 🖼️' : d.result, 4000); break;
-        case 'uploaded': {
-          const map = { own: '#vOwnStatus', sample: '#cSampleStatus', consent: '#cConsentStatus' };
-          upl[d.purpose] = d.file_id;
-          if (map[d.purpose]) $(map[d.purpose]).textContent = '✓ Rekaman siap (' + d.file_id + ')';
+        case 'uploaded':
+          upl[d.purpose] = d.path;
+          if (STATUS_EL[d.purpose]) $(STATUS_EL[d.purpose]).textContent = '✓ ' + (d.name || 'siap');
           break;
-        }
+        case 'cloned':
+          $('#cMake').disabled = false; $('#cMake').innerHTML = '🧬 Kloning sekarang';
+          if (d.error) toast('Gagal: ' + d.error, 5000); else { toast('Suara siap: ' + d.name + ' 🧬', 4000); loadVoices(); }
+          break;
+        case 'job': onJob(d); break;
       }
     },
     back() { if (page !== 'home') { go('home'); return true; } return false; },
@@ -509,6 +463,7 @@
       openSetting: noop, requestPermissions: noop, toggleLive: () => window.NEXA.onEvent(JSON.stringify({ type: 'live', on: !$('#orb').classList.contains('live') })),
       setWake: noop, sendText: noop, stopAgent: noop, dictate: noop, testVoice: noop, quick: () => 'OK: contoh', apps: () => '[{"name":"YouTube","pkg":"x"},{"name":"WhatsApp","pkg":"y"}]',
       notes: () => '[]', saveNotes: noop, tiktokConnect: () => 'OK', tiktokDisconnect: noop, tiktokTest: noop, tiktokPause: noop, tiktokStats: () => '',
-      generateImage: noop, saveFromServer: noop, recordStart: () => 'OK', recordStop: noop, openUrl: noop };
+      generateImage: noop, recordStart: () => 'OK', recordStop: noop, openUrl: noop, pickAudio: noop, makeVideo: () => 'OK:x', jobs: () => '[]', cancelJob: noop,
+      gallery: () => '[]', deleteMedia: noop, voices: () => '[{"id":"gemini:Kore","name":"Gemini Kore"}]', deleteVoice: noop, cloneVoice: noop, previewVoice: noop };
   }
 })();

@@ -34,20 +34,27 @@ jobs:
           echo "$KEYSTORE_B64" | base64 -d > $RUNNER_TEMP/nexa.jks
           echo "NEXA_KEYSTORE_FILE=$RUNNER_TEMP/nexa.jks" >> $GITHUB_ENV
 
-      - name: Build APK (debug + release)
+      - name: Cek tanda tangan pribadi
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::warning::Secret NEXA_KEYSTORE_BASE64 belum diisi. APK ditandatangani kunci debug dan TIDAK bisa menimpa versi bertanda tangan pribadi. Jalankan tools/setup_signing.sh di Termux."
+          else
+            echo "Tanda tangan pribadi aktif ✓"
+          fi
+
+      - name: Build APK (release, bertanda tangan)
         env:
           NEXA_KEYSTORE_PASSWORD: ${{ secrets.NEXA_KEYSTORE_PASSWORD }}
           NEXA_KEY_ALIAS: ${{ secrets.NEXA_KEY_ALIAS }}
           NEXA_KEY_PASSWORD: ${{ secrets.NEXA_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug assembleRelease --stacktrace
+          ./gradlew assembleRelease --stacktrace
 
       - name: Ganti nama APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/*.apk   out/NEXA-AI-BY-NATAN-debug.apk
-          cp app/build/outputs/apk/release/*.apk out/NEXA-AI-BY-NATAN-release.apk
+          cp app/build/outputs/apk/release/*.apk out/NEXA-AI-BY-NATAN-v3.0.${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         with:

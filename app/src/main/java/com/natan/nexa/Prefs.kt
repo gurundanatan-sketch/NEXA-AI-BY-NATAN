@@ -6,7 +6,7 @@ import org.json.JSONObject
 /**
  * Semua pengaturan NEXA disimpan di HP (SharedPreferences).
  * UI (assets/web) membaca & menulis lewat toJson()/applyJson().
- * Kunci API OpenAI & MiniMax disimpan di Termux (~/.nexa_env) untuk server, bukan di sini.
+ * Semua kunci API (Gemini, OpenAI, Fish Audio, TikTok) disimpan di sini — aplikasi berjalan mandiri tanpa Termux.
  */
 class Prefs(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("nexa", Context.MODE_PRIVATE)
@@ -28,24 +28,31 @@ class Prefs(context: Context) {
             "live_barge_in" to true,
             "image_model" to "gemini-3.1-flash-image",
             "enhance_prompt" to true,
+            // --- Kunci API lain (semua tersimpan di HP, tanpa server) ---
+            "openai_key" to "",
+            "fish_key" to "",
+            "fish_model" to "s2.1-pro",           // s2.1-pro | s2.1-pro-free | s2-pro
+            "openai_tts_model" to "gpt-4o-mini-tts",
+            "openai_stt_model" to "whisper-1",
             // --- Suara mode perintah ---
-            "voice_engine" to "gemini",          // gemini | server | android | sovits
+            "voice_engine" to "gemini",          // gemini | openai | fish | android | sovits
             "tts_model" to "gemini-3.8-flash-tts",
             "tts_voice" to "Kore",
-            "server_voice" to "",                // engine:voice_id di server, mis. minimax:NexaVoice01
-            "video_voice" to "gemini:Kore",      // suara default video (bisa minimax:<id kloning>)
-            // --- GPT-SoVITS ---
+            "openai_voice" to "coral",
+            "fish_voice" to "",                  // reference_id suara Fish (kloning)
+            "video_voice" to "gemini:Kore",      // gemini:Kore | openai:coral | fish:<id>
+            "voices" to "[]",                    // suara kloning tersimpan
+            // --- GPT-SoVITS (opsional, PC) ---
             "sovits_url" to "",
             "sovits_ref" to "",
             "sovits_prompt" to "",
             "sovits_lang" to "en",
-            // --- Server NEXA (Termux/Colab) ---
-            "backend_url" to "http://127.0.0.1:5000",
-            "backend_token" to "",
             // --- TikTok Live ---
+            "tt_provider" to "euler",            // euler | tiktool | termux
+            "tt_api_key" to "",
             "tt_bridge" to "ws://127.0.0.1:8090",
             "tt_username" to "",
-            "tt_engine" to "android",            // android | gemini | server
+            "tt_engine" to "android",            // android | gemini | openai | fish
             "tt_rate" to 1.05f,
             "tt_on_follow" to true,
             "tt_on_like" to true,
@@ -115,5 +122,7 @@ class Prefs(context: Context) {
     var sovitsLang: String get() = str("sovits_lang"); set(v) = put("sovits_lang", v)
     var backendUrl: String get() = str("backend_url").trimEnd('/'); set(v) = put("backend_url", v)
     var backendToken: String get() = str("backend_token"); set(v) = put("backend_token", v)
+    val openaiKey: String get() = str("openai_key")
+    val fishKey: String get() = str("fish_key")
     val assistantName: String get() = str("assistant_name").ifBlank { "Nexa" }
 }

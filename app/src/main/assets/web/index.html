@@ -101,7 +101,7 @@
           <button class="btn ghost sm" id="ttDisconnect">Putus</button>
           <button class="btn ghost sm" id="ttPause">⏸ Jeda baca</button>
         </div>
-        <p class="hint">Butuh <code>server.js</code> berjalan di Termux (lihat Pengaturan → Panduan Termux). Akun harus sedang live.</p>
+        <p class="hint">Tersambung langsung dari HP lewat layanan TikTok LIVE (isi API key di bagian <b>Pengaturan pembacaan</b>). Akun harus sedang live.</p>
       </div>
 
       <div class="grid g3" style="margin-bottom:14px">
@@ -134,11 +134,21 @@
 
       <div class="card">
         <h3>⚙️ Pengaturan pembacaan</h3>
+        <label class="f">Penyedia koneksi TikTok LIVE</label>
+        <select data-pref="tt_provider">
+          <option value="euler">Euler Stream (langsung dari HP)</option>
+          <option value="tiktool">TikTool (langsung dari HP)</option>
+          <option value="termux">Termux server.js (cara lama)</option>
+        </select>
+        <label class="f">API key penyedia</label>
+        <input type="password" data-pref="tt_api_key" placeholder="dari eulerstream.com atau tik.tools (gratis)">
+        <p class="hint">Daftar gratis di <a href="#" data-url="https://www.eulerstream.com" style="color:var(--cyan)">eulerstream.com</a> atau <a href="#" data-url="https://tik.tools" style="color:var(--cyan)">tik.tools</a>, salin API key, tempel di sini.</p>
         <label class="f">Mesin suara</label>
         <select data-pref="tt_engine">
           <option value="android">TTS Android (tercepat, offline)</option>
           <option value="gemini">Gemini TTS (natural)</option>
-          <option value="server">Server NEXA (MiniMax kloning / OpenAI)</option>
+          <option value="fish">Fish Audio (suara kloning)</option>
+          <option value="openai">OpenAI TTS</option>
         </select>
         <label class="f">Kecepatan bicara: <b id="rateVal">1.05</b>×</label>
         <input type="range" min="0.6" max="1.8" step="0.05" data-pref="tt_rate">
@@ -187,7 +197,7 @@
             <p class="hint">Rekam atau unggah narasi dengan <b>suaramu sendiri</b>. Nexa mentranskrip, membuat visual per kalimat, dan menyinkronkan subtitle.</p>
             <div class="row mt">
               <button class="btn ghost sm" id="vOwnRec">⏺ Rekam</button>
-              <label class="btn ghost sm" style="margin:0">📂 Pilih file<input type="file" id="vOwnFile" accept="audio/*" hidden></label>
+              <button class="btn ghost sm" id="vOwnFile">📂 Pilih file</button>
             </div>
             <p class="hint" id="vOwnStatus">Belum ada audio</p>
           </div>
@@ -195,7 +205,7 @@
           <div id="vVoiceBox">
             <label class="f">Suara narator</label>
             <select id="vVoice"><option value="gemini:Kore">Gemini Kore</option></select>
-            <p class="hint">Suara kloning (MiniMax / Gemini) muncul di sini setelah dibuat di tab <b>Suara</b>.</p>
+            <p class="hint">Suara kloning (Fish Audio / Gemini) muncul di sini setelah dibuat di tab <b>Suara</b>.</p>
           </div>
 
           <div class="grid g2">
@@ -206,7 +216,7 @@
           </div>
           <label class="f">Musik latar (opsional, otomatis mengecil saat narasi)</label>
           <div class="row">
-            <label class="btn ghost sm" style="margin:0">🎵 Pilih musik<input type="file" id="vBgm" accept="audio/*" hidden></label>
+            <button class="btn ghost sm" id="vBgm">🎵 Pilih musik</button>
             <span class="hint auto" id="vBgmName" style="margin:0">—</span>
           </div>
           <div class="switch mt">
@@ -243,13 +253,13 @@
           <input type="text" id="cName" placeholder="mis. Suara Natan">
           <label class="f">Mesin</label>
           <select id="cEngine">
-            <option value="minimax">MiniMax Speech (cepat, 10 dtk – 5 mnt sampel)</option>
+            <option value="fish">Fish Audio (cepat, sampel 10–30 detik)</option>
             <option value="gemini">Gemini Voice Replication (perlu rekaman persetujuan)</option>
           </select>
           <label class="f">Sampel suara (jernih, tanpa musik)</label>
           <div class="row">
             <button class="btn ghost sm" id="cRec">⏺ Rekam sampel</button>
-            <label class="btn ghost sm" style="margin:0">📂 File<input type="file" id="cFile" accept="audio/*" hidden></label>
+            <button class="btn ghost sm" id="cFile">📂 File</button>
           </div>
           <p class="hint" id="cSampleStatus">Belum ada sampel</p>
           <div id="cConsentBox" style="display:none">
@@ -257,7 +267,7 @@
             <p class="hint">Bacakan kalimat persetujuan resmi Google (lihat ai.google.dev → Voice replication).</p>
             <div class="row mt">
               <button class="btn ghost sm" id="cConsentRec">⏺ Rekam persetujuan</button>
-              <label class="btn ghost sm" style="margin:0">📂 File<input type="file" id="cConsentFile" accept="audio/*" hidden></label>
+              <button class="btn ghost sm" id="cConsentFile">📂 File</button>
             </div>
             <p class="hint" id="cConsentStatus">Belum ada</p>
           </div>
@@ -269,15 +279,16 @@
         </div>
         <div class="card">
           <h3>🎧 Suara tersedia <button class="btn ghost sm auto" id="voicesRefresh" style="margin-left:auto">↻</button></h3>
-          <div id="voiceList"><div class="empty">Sambungkan server NEXA di Pengaturan</div></div>
-          <p class="hint">Suara kloning MiniMax dihapus otomatis jika tidak dipakai 7 hari — pakai minimal sekali.</p>
+          <div id="voiceList"><div class="empty">Memuat…</div></div>
+          <p class="hint">▶ = dengar contoh · ★ = jadikan suara default video & asisten · 🗑 = hapus dari daftar.</p>
         </div>
       </div>
 
       <!-- GALERI -->
       <div class="subpage" id="sub-gallery">
         <div class="card">
-          <h3>📁 Hasil di server <button class="btn ghost sm auto" id="galRefresh" style="margin-left:auto">↻</button></h3>
+          <h3>📁 Hasil Studio <button class="btn ghost sm auto" id="galRefresh" style="margin-left:auto">↻</button></h3>
+          <p class="hint" style="margin-top:-6px">Semua hasil juga otomatis tersimpan di Galeri HP (Movies/NEXA & Pictures/NEXA).</p>
           <div class="gallery" id="gallery"></div>
         </div>
       </div>
@@ -322,7 +333,7 @@
         <h3>🔑 Kunci & model Gemini (AI Studio)</h3>
         <label class="f">Gemini API key</label>
         <input type="password" data-pref="gemini_key" placeholder="AIza…">
-        <p class="hint">Dapatkan di <a href="#" data-url="https://aistudio.google.com/apikey" style="color:var(--cyan)">aistudio.google.com/apikey</a>. Kunci OpenAI & MiniMax disimpan di Termux (server), bukan di sini.</p>
+        <p class="hint">Dapatkan di <a href="#" data-url="https://aistudio.google.com/apikey" style="color:var(--cyan)">aistudio.google.com/apikey</a>. Semua kunci tersimpan hanya di HP ini.</p>
         <label class="f">Model agen</label><input type="text" data-pref="agent_model">
         <label class="f">Model Live (ngobrol real-time)</label><input type="text" data-pref="live_model">
         <label class="f">Model gambar</label><input type="text" data-pref="image_model">
@@ -344,28 +355,36 @@
           <label class="toggle"><input type="checkbox" data-pref="wake_mute_beep"><span></span></label></div>
       </div>
 
-      <div class="card">
-        <h3>🔈 Suara mode perintah</h3>
-        <label class="f">Mesin</label>
-        <select data-pref="voice_engine">
-          <option value="gemini">Gemini TTS</option>
-          <option value="server">Server NEXA (MiniMax/OpenAI/kloning)</option>
-          <option value="android">TTS Android (offline)</option>
-          <option value="sovits">GPT-SoVITS langsung</option>
+      <div class="card glow">
+        <h3>🔑 Kunci API lain</h3>
+        <label class="f">OpenAI API key (transkrip suara asli & suara OpenAI)</label>
+        <input type="password" data-pref="openai_key" placeholder="sk-…">
+        <label class="f">Fish Audio API key (kloning suara)</label>
+        <input type="password" data-pref="fish_key" placeholder="…">
+        <label class="f">Model Fish Audio</label>
+        <select data-pref="fish_model">
+          <option value="s2.1-pro">s2.1-pro (kualitas terbaik)</option>
+          <option value="s2.1-pro-free">s2.1-pro-free (gratis)</option>
+          <option value="s2-pro">s2-pro</option>
         </select>
-        <label class="f">Suara Gemini TTS (Kore / voice_…)</label><input type="text" data-pref="tts_voice">
-        <label class="f">Suara server (mis. minimax:NexaSuara1234)</label><input type="text" data-pref="server_voice">
-        <label class="f">Suara default video</label><input type="text" data-pref="video_voice">
-        <button class="btn ghost mt" id="testVoice">▶ Tes suara</button>
+        <p class="hint">Aplikasi berjalan mandiri — tidak perlu Termux. Kunci API hanya tersimpan di HP ini.</p>
       </div>
 
       <div class="card">
-        <h3>🖥️ Server NEXA (Termux)</h3>
-        <label class="f">URL server media</label><input type="url" data-pref="backend_url">
-        <label class="f">Token (NEXA_TOKEN)</label><input type="password" data-pref="backend_token">
-        <label class="f">URL TikTok bridge (server.js)</label><input type="url" data-pref="tt_bridge">
-        <button class="btn ghost mt" id="pingServer">📶 Tes koneksi server</button>
-        <pre class="out" id="pingOut" style="display:none"></pre>
+        <h3>🔈 Suara asisten (mode perintah)</h3>
+        <label class="f">Mesin</label>
+        <select data-pref="voice_engine">
+          <option value="gemini">Gemini TTS</option>
+          <option value="fish">Fish Audio (suara kloning)</option>
+          <option value="openai">OpenAI TTS</option>
+          <option value="android">TTS Android (offline)</option>
+          <option value="sovits">GPT-SoVITS (PC)</option>
+        </select>
+        <label class="f">Suara Gemini (Kore / voice_…)</label><input type="text" data-pref="tts_voice">
+        <label class="f">Suara OpenAI (coral, alloy, nova…)</label><input type="text" data-pref="openai_voice">
+        <label class="f">Suara Fish Audio (id kloning — isi otomatis lewat ★ di Studio)</label><input type="text" data-pref="fish_voice">
+        <label class="f">Suara default video</label><input type="text" data-pref="video_voice">
+        <button class="btn ghost mt" id="testVoice">▶ Tes suara</button>
       </div>
 
       <div class="card">
@@ -379,15 +398,6 @@
           <button class="btn ghost sm" data-open="app">Info aplikasi</button>
         </div>
         <p class="hint">Tambahkan tombol <b>NEXA Live</b> ke Pengaturan Cepat (tarik bilah notifikasi → edit) untuk memanggil Nexa dari mana saja.</p>
-      </div>
-
-      <div class="card">
-        <h3>📘 Panduan Termux</h3>
-        <pre class="out">pkg install -y git python nodejs ffmpeg
-git clone https://github.com/gurundanatan-sketch/NEXA-AI-BY-NATAN
-cd NEXA-AI-BY-NATAN/server
-bash setup_termux.sh      # sekali saja
-bash start_nexa.sh        # setiap mau pakai</pre>
       </div>
 
       <button class="btn" id="saveSettings">💾 Simpan pengaturan</button>

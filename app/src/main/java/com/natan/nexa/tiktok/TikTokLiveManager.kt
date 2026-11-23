@@ -51,39 +51,66 @@ object TikTokLiveManager {
     private var speakerStarted = false
 
     // ------------------------------------------------------------------ koneksi
+    /**
+     * Penyedia koneksi (Pengaturan → TikTok):
+     *  - euler   : WebSocket terkelola Euler Stream (langsung dari HP, butuh API key gratis eulerstream.com)
+     *  - tiktool : WebSocket terkelola TikTool (langsung dari HP, API key gratis tik.tools)
+     *  - termux  : server/tiktok/server.js di Termux (opsional, cara lama)
+     */
     fun connect(context: Context, username: String): String {
         val app = context.applicationContext
         appContext = app
         if (voice == null) voice = VoiceOutput(app)
         val p = Prefs(app)
-        p.put("tt_username", username)
+        val user = username.removePrefix("@").trim()
+        p.put("tt_username", user)
         startSpeaker()
+        resetStats(user)
+        val key = p.str("tt_api_key")
+        val enc = java.net.URLEncoder.encode(user, "UTF-8")
 
-        val base = p.str("tt_bridge").trimEnd('/')
-        val httpBase = base.replace("ws://", "http://").replace("wss://", "https://")
-        scope.launch {
-            try {
-                // 1) buka WebSocket event
-                openSocket("$base/events?token=${p.backendToken}")
-                // 2) minta bridge menyambung ke live
-                val r = withContext(Dispatchers.IO) {
-                    JSONObject(String(Http.post("$httpBase/connect", JSONObject().put("username", username),
-                        mapOf("X-Nexa-Token" to p.backendToken), 60_000)))
+        when (val provider = p.str("tt_provider")) {
+            "euler", "tiktool" -> {
+                if (key.isBlank()) {
+                    emitInfo("Isi API key ${if (provider == "euler") "Euler Stream (eulerstream.com)" else "TikTool (tik.tools)"} di Pengaturan TikTok")
+                    return "GAGAL: API key TikTok belum diisi"
                 }
-                emitInfo("Tersambung ke live @${r.optString("username")}")
-            } catch (e: Exception) {
-                emitInfo("Gagal menyambung: ${e.message}. Pastikan server.js jalan di Termux dan @$username sedang live.")
+                val url = if (provider == "euler") "wss://ws.eulerstream.com?uniqueId=$enc&apiKey=$key"
+                else "wss://api.tik.tools?uniqueId=$enc&apiKey=$key"
+                direct = true
+                openSocket(url)
+                emitInfo("Menyambung langsung ke live @$user…")
+            }
+            else -> {
+                direct = false
+                val base = p.str("tt_bridge").trimEnd('/')
+                val httpBase = base.replace("ws://", "http://").replace("wss://", "https://")
+                scope.launch {
+                    try {
+                        openSocket("$base/events?token=${p.backendToken}")
+                        val r = withContext(Dispatchers.IO) {
+                            JSONObject(String(Http.post("$httpBase/connect", JSONObject().put("username", user),
+                                mapOf("X-Nexa-Token" to p.backendToken), 60_000)))
+                        }
+                        emitInfo("Tersambung ke live @${r.optString("username")}")
+                    } catch (e: Exception) {
+                        emitInfo("Gagal menyambung lewat Termux: ${e.message}")
+                    }
+                }
             }
         }
-        return "OK: menyambung ke live @$username…"
+        return "OK: menyambung ke live @$user…"
     }
 
     fun disconnect(context: Context): String {
         val p = Prefs(context)
-        val httpBase = p.str("tt_bridge").trimEnd('/').replace("ws://", "http://").replace("wss://", "https://")
-        scope.launch(Dispatchers.IO) {
-            try { Http.post("$httpBase/disconnect", JSONObject(), mapOf("X-Nexa-Token" to p.backendToken)) } catch (_: Exception) {}
+        if (!direct) {
+            val httpBase = p.str("tt_bridge").trimEnd('/').replace("ws://", "http://").replace("wss://", "https://")
+            scope.launch(Dispatchers.IO) {
+                try { Http.post("$httpBase/disconnect", JSONObject(), mapOf("X-Nexa-Token" to p.backendToken)) } catch (_: Exception) {}
+            }
         }
+        manualClose = true
         ws?.close(1000, null); ws = null; connected = false
         emitInfo("Live TikTok diputus")
         return "OK: live TikTok diputus"
@@ -117,19 +144,91 @@ object TikTokLiveManager {
     }
 
     private fun openSocket(url: String) {
+        manualClose = false
         ws?.close(1000, null)
         ws = client.newWebSocket(Request.Builder().url(url).build(), object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) { connected = true }
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                val ev = try { JSONObject(text) } catch (e: Exception) { return }
-                scope.launch { handle(ev) }
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                connected = true
+                if (direct) scope.launch { handle(JSONObject().put("type", "connected").put("username", lastUser)) }
             }
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { connected = false }
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val raw = try { JSONObject(text) } catch (e: Exception) { return }
+                if (direct) {
+                    for (ev in TikTokEvents.normalize(raw)) scope.launch { onDirect(ev) }
+                } else scope.launch { handle(raw) }
+            }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                connected = false
+                scope.launch { handle(JSONObject().put("type", "disconnected")) }
+                if (code != 1000 && reason.isNotBlank()) emitInfo("TikTok: $reason")
+            }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 connected = false
-                emitInfo("Koneksi ke server.js terputus: ${t.message}")
+                val why = response?.let { "HTTP ${it.code}" } ?: t.message
+                emitInfo("Koneksi TikTok terputus: $why")
+                // sambung ulang otomatis setelah 15 detik (hindari rate limit)
+                if (!manualClose) scope.launch { delay(15_000); if (!connected && !manualClose) openSocket(url) }
             }
         })
+    }
+
+    // ------------------------------------------------------------------ mode langsung: gabung like, combo, statistik
+    @Volatile private var direct = false
+    @Volatile private var manualClose = false
+    private var lastUser = ""
+    private val likeBuf = mutableMapOf<String, Pair<JSONObject, Int>>()
+    private val st = JSONObject()
+    private val top = mutableMapOf<String, Pair<String, Int>>()
+
+    private fun resetStats(user: String) {
+        lastUser = user
+        listOf("follows", "shares", "likes", "coins", "gifts", "joins", "chats", "guests", "viewers").forEach { st.put(it, 0) }
+        top.clear()
+        lastStats = JSONObject()
+    }
+
+    private fun bump(k: String, n: Int = 1) { st.put(k, st.optInt(k) + n) }
+
+    private fun pushStats() {
+        val arr = JSONArray()
+        top.entries.sortedByDescending { it.value.second }.take(5).forEach {
+            arr.put(JSONObject().put("uniqueId", it.key).put("nickname", it.value.first).put("coins", it.value.second))
+        }
+        val s = JSONObject(st.toString()).put("topGifters", arr).put("username", lastUser)
+        handle(JSONObject().put("type", "stats").put("stats", s))
+    }
+
+    private suspend fun onDirect(ev: JSONObject) {
+        val user = ev.optJSONObject("user") ?: JSONObject()
+        val key = user.optString("uniqueId").ifBlank { user.optString("nickname") }
+        when (ev.optString("type")) {
+            "follow" -> bump("follows")
+            "share" -> bump("shares")
+            "join" -> bump("joins")
+            "chat" -> bump("chats")
+            "guest_request" -> bump("guests")
+            "viewers" -> { st.put("viewers", ev.optInt("viewers")); pushStats(); return }
+            "like" -> {
+                val n = ev.optInt("likeCount", 1)
+                if (ev.has("totalLikes")) st.put("likes", ev.optInt("totalLikes")) else bump("likes", n)
+                val prev = likeBuf[key]
+                if (prev != null) { likeBuf[key] = prev.first to prev.second + n; return }
+                likeBuf[key] = user to n
+                delay(8_000) // gabungkan like dari orang yang sama selama 8 detik
+                val (u, total) = likeBuf.remove(key) ?: return
+                handle(JSONObject().put("type", "like").put("user", u).put("likeCount", total))
+                pushStats(); return
+            }
+            "gift" -> {
+                val g = ev.optJSONObject("gift") ?: JSONObject()
+                if (g.optBoolean("inCombo")) return       // tunggu combo selesai
+                bump("gifts", g.optInt("count", 1)); bump("coins", g.optInt("totalCoins"))
+                val t = top[key]
+                top[key] = user.optString("nickname", key) to ((t?.second ?: 0) + g.optInt("totalCoins"))
+            }
+        }
+        handle(ev)
+        pushStats()
     }
 
     // ------------------------------------------------------------------ event → kalimat

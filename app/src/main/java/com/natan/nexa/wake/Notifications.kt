@@ -17,6 +17,7 @@ object Notifications {
     const val LIVE_ID = 42
     const val WAKE_ID = 43
     const val INFO_ID = 44
+    const val STUDIO_ID = 45
 
     fun ensureChannel(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return

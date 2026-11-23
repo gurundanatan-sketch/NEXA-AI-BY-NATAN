@@ -79,12 +79,12 @@ object Tools {
             JSONObject().put("query", str("Kata kunci pencarian")), listOf("query")))
         .put(fn("generate_image", "Buat gambar dari deskripsi dan simpan ke Galeri.",
             JSONObject().put("prompt", str("Deskripsi gambar yang detail")), listOf("prompt")))
-        .put(fn("make_video", "Buat video dari naskah ATAU topik (server NEXA, hasil ke Galeri). Bisa memakai suara kloning.",
+        .put(fn("make_video", "Buat video dari naskah ATAU topik (diproses di HP, hasil ke Galeri). Bisa memakai suara kloning.",
             JSONObject()
                 .put("script", str("Naskah lengkap (kosongkan jika hanya topik)"))
                 .put("topic", str("Topik video bila tidak ada naskah"))
                 .put("duration_min", int("Perkiraan durasi menit bila dari topik"))
-                .put("voice", str("Suara: gemini:Kore, minimax:<id kloning>, openai:coral. Kosong = default"))
+                .put("voice", str("Suara: gemini:Kore, fish:<id kloning>, openai:coral. Kosong = default"))
                 .put("mode", choice("images = gambar + efek kamera (hemat), clips = klip video AI (mahal)", "images", "clips"))
                 .put("aspect", choice("Rasio", "9:16", "16:9", "1:1"))))
         // --- jam, catatan, perangkat ---

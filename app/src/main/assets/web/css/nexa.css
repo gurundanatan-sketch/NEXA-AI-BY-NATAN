@@ -340,8 +340,8 @@ nav.bottom .center { color: var(--muted); }
 details.tpl { border-top: 1px solid var(--stroke); padding: 6px 0; }
 details.tpl summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 10px 2px; font-size: 14px; }
 details.tpl summary::-webkit-details-marker { display: none; }
-details.tpl summary .ic { font-size: 20px; }
-details.tpl summary span { flex: 1; }
+details.tpl summary .ic { font-size: 20px; flex: 0 0 auto; width: 28px; }
+details.tpl summary > span:not(.ic) { flex: 1; }
 details.tpl[open] summary { color: var(--cyan); }
 .app-list { max-height: 300px; overflow-y: auto; }
 .app-list .a { padding: 11px 4px; border-bottom: 1px solid var(--stroke); font-size: 14px; display: flex; justify-content: space-between; }

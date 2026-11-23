@@ -11,8 +11,11 @@ android {
         applicationId = "com.natan.nexa"
         minSdk = 26          // Android 8.0
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0.0"
+        // Nomor versi naik otomatis di setiap build GitHub Actions →
+        // APK baru selalu bisa menimpa versi lama (dengan tanda tangan yang sama).
+        val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+        versionCode = 100 + run
+        versionName = "3.0.$run"
     }
 
     signingConfigs {
@@ -32,6 +35,8 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // Tanda tangan pribadi dari GitHub Secrets. Tanpa itu dipakai kunci debug
+            // (APK tidak bisa menimpa versi bertanda tangan pribadi).
             val ks = System.getenv("NEXA_KEYSTORE_FILE")
             signingConfig = if (ks != null && file(ks).exists()) signingConfigs.getByName("release")
             else signingConfigs.getByName("debug")
@@ -58,5 +63,10 @@ dependencies {
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")   // WebSocket: Gemini Live & TikTok bridge
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")   // WebSocket: Gemini Live & TikTok
+    // Perakit video di HP (pengganti FFmpeg)
+    implementation("androidx.media3:media3-transformer:1.5.1")
+    implementation("androidx.media3:media3-effect:1.5.1")
+    implementation("androidx.media3:media3-common:1.5.1")
+    implementation("com.google.guava:guava:33.3.1-android")
 }

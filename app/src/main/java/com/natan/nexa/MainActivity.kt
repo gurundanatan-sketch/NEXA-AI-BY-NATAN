@@ -18,6 +18,7 @@ import androidx.core.view.WindowCompat
 import androidx.webkit.WebViewAssetLoader
 import com.natan.nexa.agent.AgentRunner
 import com.natan.nexa.live.LiveVoiceService
+import com.natan.nexa.studio.VideoJobs
 import com.natan.nexa.tiktok.TikTokLiveManager
 import com.natan.nexa.ui.NexaBridge
 import com.natan.nexa.wake.WakeWordService
@@ -47,6 +48,30 @@ class MainActivity : AppCompatActivity() {
             emit(JSONObject().put("type", "dictation").put("text", text ?: ""))
         }
 
+    /** Pemilih file audio → disalin ke penyimpanan aplikasi → event "uploaded". */
+    private var pickPurpose = ""
+    private val audioPicker =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            try {
+                val dir = java.io.File(filesDir, "input").apply { mkdirs() }
+                val ext = contentResolver.getType(uri)?.substringAfter('/')?.let {
+                    when (it) { "mpeg" -> "mp3"; "x-wav", "wav" -> "wav"; "mp4", "aac", "m4a", "x-m4a" -> "m4a"; "ogg" -> "ogg"; else -> it }
+                } ?: "audio"
+                val f = java.io.File(dir, "${pickPurpose}_${System.currentTimeMillis()}.$ext")
+                contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it) } }
+                emit(JSONObject().put("type", "uploaded").put("data",
+                    JSONObject().put("purpose", pickPurpose).put("path", f.absolutePath).put("name", f.name)))
+            } catch (e: Exception) {
+                emit(JSONObject().put("type", "toast").put("data", JSONObject().put("text", "Gagal membaca file: ${e.message}")))
+            }
+        }
+
+    fun pickAudio(purpose: String) {
+        pickPurpose = purpose
+        audioPicker.launch("audio/*")
+    }
+
     val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { emitStatus() }
 
@@ -60,6 +85,8 @@ class MainActivity : AppCompatActivity() {
 
         val loader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            // hasil Studio (video & gambar) untuk Galeri di dalam aplikasi
+            .addPathHandler("/media/", WebViewAssetLoader.InternalStoragePathHandler(this, VideoJobs.outputDir(this)))
             .build()
 
         web = WebView(this).apply {
@@ -100,6 +127,7 @@ class MainActivity : AppCompatActivity() {
         AgentRunner.listener = { msg -> emit(JSONObject().put("type", "log").put("text", msg)) }
         LiveVoiceService.onStateChange = { on -> emit(JSONObject().put("type", "live").put("on", on)) }
         TikTokLiveManager.onEvent = { ev -> emit(JSONObject().put("type", "tiktok").put("data", ev)) }
+        VideoJobs.onUpdate = { job -> emit(JSONObject().put("type", "job").put("data", job)) }
 
         handleIntent(intent)
     }
@@ -134,6 +162,7 @@ class MainActivity : AppCompatActivity() {
         AgentRunner.listener = null
         LiveVoiceService.onStateChange = null
         TikTokLiveManager.onEvent = null
+        VideoJobs.onUpdate = null
         web.destroy()
         super.onDestroy()
     }

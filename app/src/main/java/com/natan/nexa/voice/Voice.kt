@@ -69,22 +69,62 @@ class GeminiTts(
 }
 
 // -------------------------------------------------------------------------
-// 2) SERVER NEXA /tts — MiniMax (suara kloning), OpenAI, Gemini, GPT-SoVITS
-//    Kunci API-nya ada di Termux, bukan di HP.
+// 2) OPENAI TTS — langsung dari HP
 // -------------------------------------------------------------------------
-class ServerTts(
-    private val baseUrl: String,
-    private val token: String,
-    private val voice: String, // mis. "minimax:NexaVoice01", "openai:alloy", "gemini:Kore"
+class OpenAiTts(
+    private val apiKey: String,
+    private val model: String,   // gpt-4o-mini-tts
+    private val voice: String,   // coral, alloy, nova, shimmer, echo, sage…
 ) : TtsEngine {
     override suspend fun synthesize(text: String): ByteArray = withContext(Dispatchers.IO) {
-        Http.post("$baseUrl/tts", JSONObject().put("text", text).put("voice", voice),
-            mapOf("X-Nexa-Token" to token))
+        Http.post("https://api.openai.com/v1/audio/speech", JSONObject()
+            .put("model", model).put("voice", voice).put("input", text)
+            .put("response_format", "mp3")
+            .put("instructions", "Bicara dalam bahasa Indonesia, hangat, ekspresif, dan jelas."),
+            mapOf("Authorization" to "Bearer $apiKey"))
     }
 }
 
 // -------------------------------------------------------------------------
-// 3) GPT-SoVITS langsung (PC/GPU) — zh, en, ja, ko, yue
+// 3) FISH AUDIO TTS — suara kloning (reference_id) langsung dari HP
+// -------------------------------------------------------------------------
+class FishTts(
+    private val apiKey: String,
+    private val model: String,       // s2.1-pro | s2.1-pro-free | s2-pro
+    private val referenceId: String, // id suara kloning; kosong = suara default
+) : TtsEngine {
+    override suspend fun synthesize(text: String): ByteArray = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("text", text).put("format", "mp3")
+        if (referenceId.isNotBlank()) body.put("reference_id", referenceId)
+        Http.post("https://api.fish.audio/v1/tts", body,
+            mapOf("Authorization" to "Bearer $apiKey", "model" to model), 180_000)
+    }
+}
+
+/** Membuat mesin suara dari spesifikasi "mesin:id", mis. gemini:Kore, openai:coral, fish:<id>. */
+object Tts {
+    fun fromSpec(p: Prefs, spec: String): TtsEngine {
+        val engine = spec.substringBefore(':')
+        val id = spec.substringAfter(':', "")
+        return when (engine) {
+            "openai" -> {
+                require(p.openaiKey.isNotBlank()) { "Kunci OpenAI belum diisi di Pengaturan" }
+                OpenAiTts(p.openaiKey, p.str("openai_tts_model"), id.ifBlank { p.str("openai_voice") })
+            }
+            "fish" -> {
+                require(p.fishKey.isNotBlank()) { "Kunci Fish Audio belum diisi di Pengaturan" }
+                FishTts(p.fishKey, p.str("fish_model"), id.ifBlank { p.str("fish_voice") })
+            }
+            else -> {
+                require(p.geminiApiKey.isNotBlank()) { "Kunci Gemini belum diisi di Pengaturan" }
+                GeminiTts(p.geminiApiKey, p.geminiTtsModel, id.ifBlank { p.geminiVoice })
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 4) GPT-SoVITS langsung (PC/GPU) — zh, en, ja, ko, yue
 // -------------------------------------------------------------------------
 class GptSovitsTts(
     private val baseUrl: String,
@@ -103,7 +143,7 @@ class GptSovitsTts(
 }
 
 // -------------------------------------------------------------------------
-// 4) TTS bawaan Android — paling cepat & offline (cocok untuk TikTok Live)
+// 5) TTS bawaan Android — paling cepat & offline (cocok untuk TikTok Live)
 // -------------------------------------------------------------------------
 class AndroidTts(context: Context) {
     @Volatile private var ready = false
@@ -143,15 +183,15 @@ class VoiceOutput(private val context: Context) {
 
     private fun engine(p: Prefs, name: String): TtsEngine? = when (name) {
         "gemini" -> if (p.geminiApiKey.isNotEmpty()) GeminiTts(p.geminiApiKey, p.geminiTtsModel, p.geminiVoice) else null
-        "server" -> if (p.backendUrl.isNotEmpty() && p.str("server_voice").isNotEmpty())
-            ServerTts(p.backendUrl, p.backendToken, p.str("server_voice")) else null
+        "openai" -> if (p.openaiKey.isNotEmpty()) OpenAiTts(p.openaiKey, p.str("openai_tts_model"), p.str("openai_voice")) else null
+        "fish" -> if (p.fishKey.isNotEmpty()) FishTts(p.fishKey, p.str("fish_model"), p.str("fish_voice")) else null
         "sovits" -> if (p.sovitsUrl.isNotEmpty() && p.sovitsRefPath.isNotEmpty())
             GptSovitsTts(p.sovitsUrl, p.sovitsRefPath, p.sovitsPromptText, p.sovitsLang) else null
         else -> null
     }
 
     /**
-     * Ucapkan teks. engineName: gemini | server | sovits | android (default = pengaturan).
+     * Ucapkan teks. engineName: gemini | openai | fish | sovits | android (default = pengaturan).
      * Jika mesin utama gagal → Gemini → TTS Android sebagai cadangan terakhir.
      * Mengembalikan pesan error, atau null jika berhasil.
      */
@@ -171,6 +211,9 @@ class VoiceOutput(private val context: Context) {
         android.speak(text, rate)
         return if (errors.isEmpty()) null else errors.joinToString("; ")
     }
+
+    /** Ucapkan dengan spesifikasi suara tertentu (gemini:Kore, openai:coral, fish:<id>). Melempar error bila gagal. */
+    suspend fun speakSpec(text: String, spec: String) = play(Tts.fromSpec(Prefs(context), spec).synthesize(text))
 
     fun stop() {
         player?.release(); player = null
@@ -220,7 +263,7 @@ object Http {
     }
 
     /** Unggah file multipart/form-data. */
-    fun upload(url: String, file: File, field: String, extra: Map<String, String>, headers: Map<String, String>): ByteArray {
+    fun upload(url: String, file: File, field: String, extra: List<Pair<String, String>>, headers: Map<String, String>): ByteArray {
         val boundary = "----nexa${System.nanoTime()}"
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"; doOutput = true

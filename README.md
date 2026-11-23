@@ -16,7 +16,7 @@ Asisten AI super-agent untuk Android. NEXA bisa **ngobrol real-time dua arah (da
 | **TikTok** | Membacakan follow, tap-tap layar, hadiah (nama, jumlah, koin), share, permintaan naik live, penonton masuk, dan komentar. Setiap event punya **kalimat kustom** (bisa banyak variasi), statistik live, top gifter, dan AI yang menjawab pertanyaan penonton |
 | **Studio** | 🎬 Video dari **naskah**, **topik**, atau **suara asli** · 🖼️ Gambar realistis (prompt diperkaya otomatis) · 🧬 Kloning suara (MiniMax / Gemini) · 📁 Galeri hasil |
 | **Pusat Kendali** 🎛️ | Volume, alarm, timer, buka aplikasi, catatan |
-| **Pengaturan** ⚙️ | Kunci & model, nama asisten, wake word, suara, server Termux, izin sistem |
+| **Pengaturan** ⚙️ | Kunci & model, nama asisten, wake word, suara, kunci API (Gemini, OpenAI, Fish Audio), izin sistem |
 
 Fungsi yang bisa dipanggil AI (lewat suara atau teks): baca layar, klik, ketik, scroll, Back/Home, buka aplikasi, WhatsApp, dialer, senter, volume, panel Wi-Fi/Bluetooth, alarm, timer, catatan, info baterai, baca & balas notifikasi, angkat/tolak telepon, Google Search, buat gambar, buat video, kontrol TikTok Live, akhiri percakapan.
 
@@ -72,38 +72,54 @@ gradle/wrapper/               Gradle Wrapper resmi 8.14.3 (dibuat dengan perinta
 
 ---
 
-## 🚀 Langkah 1 — Dapatkan APK
+## 🚀 Versi 3 — aplikasi MANDIRI (tanpa Termux)
 
-1. Buka tab **Actions** di repo ini → **Build NEXA AI APK** → jalankan terbaru (centang hijau).
-2. Unduh artifact **NEXA-AI-BY-NATAN-apk**, ekstrak, instal `NEXA-AI-BY-NATAN-release.apk`.
-3. Untuk rilis resmi: buat tag `v2.0.0` → APK otomatis muncul di **Releases**.
+Semua yang dulu berjalan di server Termux sekarang berjalan **di dalam APK**:
 
-> APK rilis ditandatangani dengan kunci debug kecuali Anda menambahkan Secrets `NEXA_KEYSTORE_BASE64`, `NEXA_KEYSTORE_PASSWORD`, `NEXA_KEY_ALIAS`, `NEXA_KEY_PASSWORD`. Simpan keystore yang sama supaya update APK tidak perlu uninstall.
+| Fitur | Dulu | Sekarang |
+|---|---|---|
+| Video dari naskah/topik/suara asli | Python + FFmpeg di Termux | **Media3 Transformer** di HP (studio/VideoRenderer.kt) |
+| Kloning suara | MiniMax via server | **Fish Audio** / Gemini langsung dari HP |
+| Transkrip suara asli | Server | **OpenAI Whisper** → Fish ASR → Gemini (langsung) |
+| TikTok LIVE | server.js (Node) | **WebSocket langsung** (Euler Stream / TikTool), Termux opsional |
 
-## 🔐 Langkah 2 — Izin di HP
+Folder `server/` tetap disertakan sebagai opsi lama, tetapi **tidak lagi diperlukan**.
 
-Buka NEXA → **Beranda → Kesiapan sistem**, aktifkan satu per satu:
-- **Gemini API key** (Pengaturan) dari https://aistudio.google.com/apikey
-- **Mikrofon & telepon**, **Aksesibilitas** (*NEXA – Kontrol Layar*), **Akses notifikasi**, **Abaikan hemat baterai**
+## 🔏 Tanda tangan pribadi (update tanpa uninstall)
 
-> Android 13+: kalau muncul *"Setelan terbatas"*, buka **Info aplikasi → ⋮ → Izinkan setelan terbatas**.
-
-## 🖥️ Langkah 3 — Server di Termux (untuk video, kloning suara, TikTok)
+Android hanya mengizinkan APK baru menimpa aplikasi lama jika **tanda tangannya sama** dan **nomor versinya lebih tinggi**.
+- Nomor versi kini naik otomatis di setiap build (`versionCode = 100 + nomor build`).
+- Tanda tangan diambil dari **GitHub Secrets**. Siapkan sekali saja di Termux:
 
 ```bash
-pkg install -y git
-git clone https://github.com/gurundanatan-sketch/NEXA-AI-BY-NATAN
-cd NEXA-AI-BY-NATAN/server
-bash setup_termux.sh          # sekali: python, nodejs, ffmpeg, modul
-nano ~/.nexa_env              # isi NEXA_TOKEN, GEMINI_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY
-bash start_nexa.sh            # setiap kali dipakai
+cd ~/NEXA-AI-BY-NATAN
+bash tools/setup_signing.sh                                   # buat kunci baru
+# atau pakai kunci yang sudah Anda punya:
+bash tools/setup_signing.sh ~/storage/downloads/natan-release-BACKUP.jks
 ```
 
-Di aplikasi → **Pengaturan → Server NEXA**: URL `http://127.0.0.1:5000`, Token = `NEXA_TOKEN`, TikTok bridge `ws://127.0.0.1:8090` → **Tes koneksi server**.
+Skrip ini menyimpan kunci ke Secrets (`NEXA_KEYSTORE_BASE64`, `NEXA_KEYSTORE_PASSWORD`, `NEXA_KEY_ALIAS`, `NEXA_KEY_PASSWORD`) dan membuat cadangan di **Download/NEXA-release-KEY-BACKUP.jks**.
+**Simpan file kunci & password-nya baik-baik.** Kalau hilang, update berikutnya tidak bisa menimpa aplikasi lama.
 
-Kunci API OpenAI & MiniMax **hanya disimpan di Termux** (`~/.nexa_env`), tidak di APK dan tidak di GitHub.
+> APK yang sudah terpasang dengan tanda tangan lain (misalnya build pertama) harus di-uninstall **sekali**. Setelah itu semua update bisa langsung menimpa.
 
----
+## 📲 Dapatkan APK
+
+```bash
+gh run list -R gurundanatan-sketch/NEXA-AI-BY-NATAN          # tunggu ✓
+gh run download -R gurundanatan-sketch/NEXA-AI-BY-NATAN -n NEXA-AI-BY-NATAN-apk -D ~/storage/downloads/NEXA
+```
+Buka **File → Download/NEXA**, lalu instal APK-nya.
+
+## 🔐 Izin & kunci di aplikasi
+
+1. **Beranda → Kesiapan sistem**: aktifkan mikrofon, Aksesibilitas, Akses notifikasi, telepon, dan baterai.
+2. **⚙️ Pengaturan**:
+   - **Gemini API key** (aistudio.google.com/apikey)
+   - **Kunci API lain**: OpenAI (`sk-…`), Fish Audio
+3. **TikTok → Pengaturan pembacaan**: pilih penyedia **Euler Stream** atau **TikTool**, lalu tempel API key gratis dari eulerstream.com atau tik.tools.
+
+> Android 13+: kalau muncul *"Setelan terbatas"*, buka **Info aplikasi → ⋮ → Izinkan setelan terbatas**.
 
 ## 🗣️ Memanggil "Nexa" tanpa membuka aplikasi
 
@@ -116,7 +132,7 @@ Kunci API OpenAI & MiniMax **hanya disimpan di Termux** (`~/.nexa_env`), tidak d
 
 ## 📺 TikTok LIVE
 
-1. Jalankan `start_nexa.sh` di Termux (TikTok bridge ikut berjalan).
+1. Isi penyedia & API key di **TikTok → Pengaturan pembacaan** (sekali saja).
 2. Mulai live di TikTok → di NEXA buka **TikTok** → isi username → **Sambung**.
 3. Atur kalimat tiap event (satu kalimat per baris, dipilih acak) dengan placeholder:
    `{nama}` `{username}` `{hadiah}` `{jumlah}` `{koin}` `{total_koin}` `{like}` `{komentar}`.
@@ -134,14 +150,14 @@ Anti-spam: like digabung per orang, hadiah combo dibacakan setelah combo selesai
 | **Topik** | Gemini menulis naskah sesuai durasi, lalu alurnya sama |
 | **Suara asli** | rekam/unggah narasi Anda → transkrip berwaktu (OpenAI Whisper; cadangan Gemini) → visual per kalimat, subtitle sinkron dengan suara Anda |
 
-Suara narator: `gemini:Kore` (bawaan), `minimax:<id>` (**kloning MiniMax Speech-02**), `gemini:voice_…` (Gemini replication), `openai:coral`, `sovits:default`.
+Suara narator: `gemini:Kore` (bawaan), `fish:<id>` (**kloning Fish Audio**), `gemini:voice_…` (Gemini replication), `openai:coral`.
 
 **Kloning suara** (Studio → Suara): rekam/unggah sampel jernih → centang izin → **Kloning sekarang** → pilih ★ untuk dijadikan default.
-- MiniMax: suara kloning yang tidak dipakai selama 7 hari dihapus otomatis, jadi pakai minimal sekali.
-- Gemini: wajib ada rekaman persetujuan dari orang yang sama. Jalur REST di server bersifat eksperimental; bila gagal, pakai `tools/buat_suara_gemini.py` (SDK resmi).
+- Fish Audio: sampel jernih 10–30 detik tanpa musik memberi hasil terbaik.
+- Gemini: wajib ada rekaman persetujuan dari orang yang sama (eksperimental; bila gagal, pakai `tools/buat_suara_gemini.py`).
 - **Hanya kloning suara milik sendiri atau suara yang pemiliknya sudah memberi izin.**
 
-Musik latar otomatis mengecil saat ada narasi (auto-ducking). Subtitle ditanam ke video, 3–4 kata per baris.
+Musik latar diputar pelan di bawah narasi. Subtitle ditanam ke video, 3–4 kata per baris. Gambar diberi gerak kamera (zoom/geser).
 
 ---
 
