@@ -17,7 +17,6 @@ import android.text.style.StyleSpan
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
-import androidx.media3.common.OverlaySettings
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.ChannelMixingAudioProcessor
 import androidx.media3.common.audio.ChannelMixingMatrix
@@ -25,7 +24,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
-import androidx.media3.effect.StaticOverlaySettings
+import androidx.media3.effect.OverlaySettings
 import androidx.media3.effect.TextOverlay
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
@@ -203,7 +202,7 @@ class VideoRenderer(private val context: Context) {
 
     /** Subtitle putih tebal berlatar gelap, di bawah layar. */
     private class SubtitleOverlay(private val cues: List<Cue>, private val frameHeight: Int) : TextOverlay() {
-        private val settings: OverlaySettings = StaticOverlaySettings.Builder()
+        private val settings: OverlaySettings = OverlaySettings.Builder()
             .setBackgroundFrameAnchor(0f, -0.72f)
             .build()
         private val textPx = (frameHeight * 0.034f).toInt().coerceAtLeast(28)
