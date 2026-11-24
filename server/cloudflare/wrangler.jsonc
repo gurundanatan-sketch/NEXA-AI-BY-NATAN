@@ -1,0 +1,8 @@
+{
+  // NEXA AI BY NATAN — server pribadi (Cloudflare Workers)
+  "name": "nexa-server",
+  "main": "worker.js",
+  "compatibility_date": "2025-01-01",
+  // Database akun & saran — dibuat otomatis oleh tombol "Deploy to Cloudflare"
+  "kv_namespaces": [{ "binding": "DB" }]
+}

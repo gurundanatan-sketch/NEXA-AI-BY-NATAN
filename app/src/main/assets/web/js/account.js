@@ -17,6 +17,7 @@
   const pending = {};
   let seq = 0;
   function api(method, path, body) {
+    if (!S().server_active) return localApi(method, path, body || {});
     return new Promise((resolve) => {
       const id = 'r' + ++seq;
       pending[id] = resolve;
@@ -32,20 +33,104 @@
   };
   const errText = (r) => (r && r.data && r.data.error) || 'Gagal terhubung ke server';
 
+  // ------------------------------------------------------------------ MODE MANDIRI (tanpa server): akun di HP
+  async function sha(t) {
+    try {
+      const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+      return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+    } catch (e) { let h = 0; for (const c of t) h = (h * 31 + c.charCodeAt(0)) | 0; return 'h' + h; }
+  }
+  function normLogin(v) {
+    v = String(v || '').trim().toLowerCase();
+    if (v.includes('@')) return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v : '';
+    let d = v.replace(/[^\d+]/g, ''); if (d.startsWith('+')) d = d.slice(1); if (d.startsWith('0')) d = '62' + d.slice(1);
+    return /^\d{9,15}$/.test(d) ? d : '';
+  }
+  const ok = (data) => ({ ok: true, status: 200, data });
+  const bad = (error, status = 400) => ({ ok: false, status, data: { error } });
+  function users() { try { return JSON.parse(S().local_users || '{}'); } catch (e) { return {}; } }
+  const pub = (u) => ({ uid: u.uid, login: u.login, name: u.name || '', username: u.username || '', bio: u.bio || '', photo: u.photo || '', created: u.created });
+  async function localApi(method, path, body) {
+    const all = users();
+    if (path === '/auth/register' || path === '/auth/login') {
+      const login = normLogin(body.login);
+      if (!login) return bad('Masukkan email atau nomor telepon yang benar.');
+      if (String(body.password || '').length < 6) return bad('Kata sandi minimal 6 karakter.');
+      const u = all[login];
+      if (path === '/auth/register') {
+        if (u) return bad('Akun ini sudah terdaftar di HP ini. Silakan masuk.');
+        const salt = Math.random().toString(36).slice(2);
+        const nu = { uid: 'L' + Date.now().toString(36), login, salt, pass: await sha(salt + body.password),
+          name: String(body.name || '').slice(0, 40) || login.split('@')[0], username: '', bio: '', photo: '', created: Date.now() };
+        all[login] = nu; save({ local_users: JSON.stringify(all) });
+        return ok({ session: 'local:' + login, profile: pub(nu) });
+      }
+      if (!u) return bad('Akun belum terdaftar di HP ini. Pilih "Daftar" dulu.');
+      if ((await sha(u.salt + body.password)) !== u.pass) return bad('Kata sandi salah.');
+      return ok({ session: 'local:' + login, profile: pub(u) });
+    }
+    const login = String(S().session || '').replace(/^local:/, '');
+    const u = all[login];
+    if (!u) return bad('Sesi login habis, silakan masuk lagi.', 401);
+    if (path === '/me' && method === 'GET') return ok({ profile: pub(u) });
+    if (path === '/me') {
+      if (body.username !== undefined) {
+        const un = String(body.username).trim().toLowerCase().replace(/^@/, '');
+        if (un && !/^[a-z0-9._]{3,20}$/.test(un)) return bad('Username 3–20 huruf kecil, angka, titik, atau garis bawah.');
+        u.username = un;
+      }
+      if (body.name !== undefined) u.name = String(body.name).trim().slice(0, 40);
+      if (body.bio !== undefined) u.bio = String(body.bio).slice(0, 200);
+      if (body.photo !== undefined) u.photo = String(body.photo);
+      all[login] = u; save({ local_users: JSON.stringify(all) });
+      return ok({ profile: pub(u) });
+    }
+    if (path === '/premium/activate') {
+      let info = {}; try { info = JSON.parse(A.premiumCheck(body.code)); } catch (e) { info = { invalid: true }; }
+      if (info.invalid) return bad('Kode aktivasi salah atau bukan untuk HP ini.');
+      if (info.expired) return bad('Kode ini sudah kedaluwarsa.');
+      return ok({ premium: info, profile: pub(u) });
+    }
+    if (path === '/feedback' && method === 'POST') {
+      const list = (() => { try { return JSON.parse(S().local_feedback || '[]'); } catch (e) { return []; } })();
+      const fb = { id: Date.now() + '', name: u.name, login: u.login, text: body.text, ts: Date.now(), replies: [] };
+      list.unshift(fb); save({ local_feedback: JSON.stringify(list.slice(0, 50)) });
+      const msg = `💌 Saran untuk NEXA AI BY NATAN\nDari: ${u.name} (${u.login})\n\n${body.text}`;
+      A.openUrl(`https://wa.me/${WA}?text=${encodeURIComponent(msg)}`);
+      return ok({ ok: true, feedback: fb });
+    }
+    if (path === '/feedback/mine') {
+      try { return ok({ items: JSON.parse(S().local_feedback || '[]') }); } catch (e) { return ok({ items: [] }); }
+    }
+    if (path.startsWith('/feedback/')) return bad('Saran pengguna dikirim langsung ke WhatsApp pembuat aplikasi.');
+    return bad('Tidak tersedia di mode mandiri.');
+  }
+
   // ------------------------------------------------------------------ status akun & premium
   function account() { try { return JSON.parse(S().account || 'null'); } catch (e) { return null; } }
   function accounts() { try { return JSON.parse(S().accounts || '[]'); } catch (e) { return []; } }
   const loggedIn = () => !!(S().session && account());
   const today = () => Math.floor(Date.now() / 86400000);
   function codeInfo() {
+    if (!S().server_active) { const i = localCode(); return i ? { tier: i.tier, exp: i.exp, expired: !!i.expired } : null; }
     const m = /^NX-([OPG])(\d+)-/.exec(String(S().premium_code || '').toUpperCase());
     if (!m) return null;
     const exp = Number(m[2]);
     return { tier: m[1], exp, expired: exp !== 0 && exp < today() };
   }
-  const isOwner = () => { const c = codeInfo(); return loggedIn() && !!c && c.tier === 'O' && !c.expired; };
+  function localCode() {
+    if (S().server_active) return null;
+    try { const i = JSON.parse(A.premiumCheck(S().premium_code || '')); return i.invalid ? null : i; } catch (e) { return null; }
+  }
+  const isOwner = () => {
+    if (!S().server_active) { try { return !!A.isOwner(); } catch (e) { return false; } }
+    const c = codeInfo(); return loggedIn() && !!c && c.tier === 'O' && !c.expired;
+  };
   function premiumOK() {
-    if (!S().server_active) return true;           // server belum diatur → mode pengembang
+    if (!S().server_active) {
+      if (!S().premium_secret_set) return true;    // Premium belum diatur pembuat → bebas
+      try { return !!A.premiumAllowed(); } catch (e) { return false; }
+    }
     const c = codeInfo();
     return loggedIn() && !!c && !c.expired;
   }
@@ -80,8 +165,8 @@
     const acc = loggedIn() ? account() : null;
     $('#acctAvatar').innerHTML = avatarHtml(acc);
     $('#acctBtn').classList.toggle('has-pic', !!(acc && acc.photo));
-    $('#notifBtn').style.display = isOwner() ? '' : 'none';
-    $$('.owner-only').forEach((el) => (el.style.display = isOwner() ? '' : 'none'));
+    $('#notifBtn').style.display = isOwner() && S().server_active ? '' : 'none';
+    $$('.owner-only').forEach((el) => (el.style.display = isOwner() && (S().server_active || el.dataset.go !== 'inbox') ? '' : 'none'));
   }
 
   function renderAccount() {
@@ -231,7 +316,7 @@
     const r = await api('POST', '/feedback', { text });
     if (!r.ok) return toast(errText(r), 4000);
     $('#fbText').value = '';
-    toast('Terima kasih! Saranmu terkirim ke pembuat aplikasi 💌');
+    toast(S().server_active ? 'Terima kasih! Saranmu terkirim ke pembuat aplikasi 💌' : 'Saranmu dibuka di WhatsApp — tekan kirim ya 💌', 4000);
     loadMine();
   });
   $('#fbRefresh').addEventListener('click', loadMine);
@@ -255,6 +340,29 @@
     }));
   }
   $('#inboxRefresh').addEventListener('click', loadInbox);
+
+  // ------------------------------------------------------------------ panel pembuat (kode Premium tanpa Termux)
+  $('#ownTier').addEventListener('change', (e) => ($('#ownDaysBox').style.display = e.target.value === 'G' ? '' : 'none'));
+  $('#ownMine').addEventListener('click', () => ($('#ownDev').value = (A.deviceId && A.deviceId()) || ''));
+  $('#ownGo').addEventListener('click', async () => {
+    const body = { password: $('#ownPass').value, device: $('#ownDev').value.trim().toUpperCase(), tier: $('#ownTier').value, days: Number($('#ownDays').value || 0) };
+    if (!body.password) return toast('Isi kata sandi pembuat');
+    if (!body.device) return toast('Isi ID perangkat');
+    const btn = $('#ownGo'); btn.disabled = true;
+    const r = await api('POST', '/premium/owner-code', body);
+    btn.disabled = false;
+    if (!r.ok) return toast(errText(r), 4000);
+    $('#ownCode').textContent = r.data.code;
+    $('#ownResult').style.display = '';
+    $('#ownUse').style.display = body.device === ((A.deviceId && A.deviceId()) || '').toUpperCase() ? '' : 'none';
+    toast('Kode Premium jadi ✓');
+  });
+  $('#ownCopy').addEventListener('click', () => copy($('#ownCode').textContent, 'Kode'));
+  $('#ownWa').addEventListener('click', () => {
+    const msg = `Terima kasih sudah berlangganan NEXA Premium! 🎉\nKode aktivasi kamu:\n${$('#ownCode').textContent}\n\nCara pakai: buka NEXA → Akun → Langganan Premium → tempel kode → Aktifkan.`;
+    A.openUrl(`https://wa.me/?text=${encodeURIComponent(msg)}`);
+  });
+  $('#ownUse').addEventListener('click', () => { go('premium'); setTimeout(() => ($('#premCode').value = $('#ownCode').textContent), 100); });
 
   // ------------------------------------------------------------------ beralih akun & keluar
   function renderSwitch() {
@@ -284,8 +392,9 @@
 
   // ------------------------------------------------------------------ pengaturan berkategori
   const CAT_TITLE = { umum: 'Umum', suara: 'Pengaturan suara', bahasa: 'Bahasa', terbatas: 'Izin setelan terbatas',
-    izin: 'Izin & sistem', server: 'Server & koneksi API', tentang: 'Tentang NEXA' };
+    izin: 'Izin & sistem', kunci: 'Kunci API (khusus pembuat)', tentang: 'Tentang NEXA' };
   function showCat(cat) {
+    if (cat === 'kunci' && !isOwner()) { toast('Menu kunci API khusus pembuat aplikasi 🔐'); cat = null; }
     $('#setMenu').style.display = cat ? 'none' : '';
     $('#setBack').style.display = cat ? '' : 'none';
     $('#setTitle').textContent = cat ? CAT_TITLE[cat] || 'Pengaturan' : 'Pengaturan';
@@ -335,7 +444,8 @@
     if (p === 'feedback') { if (!loggedIn()) { toast('Login dulu ya'); return go('login'); } loadMine(); }
     if (p === 'inbox') { if (!isOwner()) { toast('Khusus pembuat aplikasi'); return go('account'); } loadInbox(); }
     if (p === 'switch') renderSwitch();
-    if (p === 'settings') showCat(null);
+    if (p === 'owner') { if (!$('#ownDev').value) $('#ownDev').value = ''; }
+    if (p === 'settings') { showCat(null); renderHeader(); }
     $('#acctBtn').classList.toggle('on', ['account', 'login', 'profile', 'premium', 'feedback', 'switch'].includes(p));
   };
 

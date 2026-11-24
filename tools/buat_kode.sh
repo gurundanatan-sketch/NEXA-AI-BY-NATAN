@@ -5,17 +5,40 @@
 # ID perangkat dilihat pengguna di aplikasi: Akun → Langganan Premium → "ID perangkat".
 set -e
 CONF="$HOME/.nexa_server"
+REPO="gurundanatan-sketch/NEXA-AI-BY-NATAN"
+BACKUP="$HOME/storage/downloads/NEXA-PREMIUM-RAHASIA-BACKUP.txt"
 [ -f "$CONF" ] && . "$CONF"
+
+# Pertama kali: buat rahasia Premium, simpan di Termux + cadangan, dan tanam ke aplikasi (GitHub Secret).
+if [ -z "$PREMIUM_SECRET" ] && [ -f "$BACKUP" ]; then . "$BACKUP"; fi
 if [ -z "$PREMIUM_SECRET" ]; then
-  echo "✗ Server premium belum diatur. Jalankan dulu: bash tools/setup_server.sh"; exit 1
+  PREMIUM_SECRET="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  NEW_SECRET=1
 fi
+umask 077
+grep -v '^PREMIUM_SECRET=' "$CONF" 2>/dev/null > "$CONF.tmp" || true
+printf 'PREMIUM_SECRET=%q\n' "$PREMIUM_SECRET" >> "$CONF.tmp"; mv "$CONF.tmp" "$CONF"
+[ -d "$HOME/storage/downloads" ] && printf 'PREMIUM_SECRET=%q\n' "$PREMIUM_SECRET" > "$BACKUP" 2>/dev/null || true
+if [ -n "$NEW_SECRET" ] || [ "$1" = "--init" ]; then
+  if printf '%s' "$PREMIUM_SECRET" | gh secret set NEXA_PREMIUM_SECRET -R "$REPO" >/dev/null 2>&1; then
+    echo "✓ Rahasia Premium tertanam ke aplikasi (cadangan: Download/NEXA-PREMIUM-RAHASIA-BACKUP.txt — JANGAN dibagikan)"
+  else
+    echo "⚠ Gagal menyimpan ke GitHub. Cek: gh auth status"
+  fi
+  if [ -n "$NEW_SECRET" ] && [ "$1" != "--init" ]; then
+    echo "!! Rahasia baru dibuat → build & pasang ulang aplikasi dulu agar kode bisa dipakai:"
+    echo "   gh workflow run build-apk.yml -R $REPO"
+  fi
+fi
+[ "$1" = "--init" ] && exit 0
+
 command -v openssl >/dev/null || pkg install -y openssl-tool
 
 DEV="$1"; JENIS="$2"; HARI="$3"
 if [ -z "$DEV" ]; then
   read -r -p "ID perangkat pengguna: " DEV
 fi
-DEV="$(printf '%s' "$DEV" | tr -d '[:space:]')"
+DEV="$(printf '%s' "$DEV" | tr -d '[:space:]' | tr 'a-z' 'A-Z')"
 [ -z "$DEV" ] && { echo "✗ ID perangkat kosong"; exit 1; }
 
 if [ -z "$JENIS" ]; then

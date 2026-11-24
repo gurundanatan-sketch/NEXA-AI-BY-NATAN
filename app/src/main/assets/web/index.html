@@ -374,7 +374,7 @@
         <button data-open="overlay"><i>🪟</i><span>Izin berjalan di atas aplikasi lain<small>Agar Nexa bisa dipanggil dari mana saja</small></span></button>
         <button data-cat="terbatas"><i>🔓</i><span>Izin setelan terbatas<small>Buka kunci Aksesibilitas & Notifikasi (Android 13+)</small></span></button>
         <button data-cat="izin"><i>🛡️</i><span>Izin & sistem<small>Mikrofon, notifikasi, baterai, asisten default</small></span></button>
-        <button data-cat="server"><i>🌐</i><span>Server & koneksi API<small>Cek koneksi Gemini, OpenAI, Fish Audio, TikTok</small></span></button>
+        <button data-cat="kunci" class="owner-only" style="display:none"><i>🔐</i><span>Kunci API (khusus pembuat)<small>Gemini, OpenAI, Fish Audio, TikTok · cek koneksi</small></span></button>
         <button data-go="premium"><i>👑</i><span>Langganan Premium<small>Rp50.000 / bulan · aktifkan dengan kode</small></span></button>
         <button data-go="feedback"><i>💌</i><span>Kirim saran & masukan<small>Langsung ke pembuat aplikasi</small></span></button>
         <button data-cat="tentang"><i>ℹ️</i><span>Tentang NEXA<small>Pencipta, fungsi, versi</small></span></button>
@@ -423,9 +423,10 @@
         <p class="hint">NEXA diciptakan oleh <b>Natanel Liaha</b> — dikenal sebagai <b>"Baginda Natan"</b>, seorang tunanetra — untuk membantu para tunanetra menavigasikan HP dan mengelola atau mengontrol HP, tablet, laptop, dan komputer dengan suara.</p>
         <p class="hint">Fitur utama: ngobrol suara real-time, kontrol HP penuh lewat suara, baca & balas notifikasi, angkat telepon, info terpercaya beserta sumbernya, asisten TikTok LIVE, Studio gambar & video banyak tokoh, kloning suara, akun & Premium.</p>
         <button class="btn ghost sm mt" id="askAbout">🎙️ Minta Nexa menjelaskan semua fiturnya</button>
+
       </div>
 
-      <div class="card glow" data-scat="server">
+      <div class="card glow" data-scat="kunci">
         <h3>🔑 Kunci & model Gemini (AI Studio)</h3>
         <label class="f">Gemini API key</label>
         <input type="password" data-pref="gemini_key" placeholder="AIza…">
@@ -452,7 +453,7 @@
           <label class="toggle"><input type="checkbox" data-pref="wake_mute_beep"><span></span></label></div>
       </div>
 
-      <div class="card glow" data-scat="server">
+      <div class="card glow" data-scat="kunci">
         <h3>🔑 Kunci API lain & model Fish Audio</h3>
         <label class="f">OpenAI API key (transkrip suara asli & suara OpenAI)</label>
         <input type="password" data-pref="openai_key" placeholder="sk-…">
@@ -633,6 +634,38 @@
     <section class="page" id="page-inbox">
       <div class="section-title">🔔 Saran dari pengguna <button class="btn ghost sm" id="inboxRefresh">↻</button></div>
       <div id="inboxList"><div class="empty">Memuat…</div></div>
+    </section>
+
+    <section class="page" id="page-owner">
+      <div class="section-title">🛠️ Panel pembuat aplikasi</div>
+      <div class="card glow">
+        <h3>🔑 Buat kode Premium</h3>
+        <label class="f">Kata sandi pembuat (OWNER_PASSWORD di Cloudflare)</label>
+        <input type="password" id="ownPass" autocomplete="off">
+        <label class="f">ID perangkat pelanggan</label>
+        <input type="text" id="ownDev" placeholder="Tempel ID perangkat dari pelanggan" autocapitalize="characters">
+        <button class="btn ghost sm mt" id="ownMine">Pakai ID HP ini</button>
+        <label class="f">Jenis kode</label>
+        <select id="ownTier">
+          <option value="P">Premium berbayar — 1 bulan</option>
+          <option value="G">Premium gratis / hadiah</option>
+          <option value="O">Pembuat aplikasi — selamanya</option>
+        </select>
+        <div id="ownDaysBox" style="display:none">
+          <label class="f">Berapa hari? (0 = selamanya)</label>
+          <input type="number" id="ownDays" value="30" min="0">
+        </div>
+        <button class="btn mt" id="ownGo">Buat kode</button>
+      </div>
+      <div class="card" id="ownResult" style="display:none">
+        <h3>✅ Kode jadi</h3>
+        <div class="row"><code class="devid" id="ownCode"></code></div>
+        <div class="grid g2 mt">
+          <button class="btn ghost sm" id="ownCopy">Salin kode</button>
+          <button class="btn sm" id="ownWa">💬 Kirim via WhatsApp</button>
+        </div>
+        <button class="btn ghost sm mt" id="ownUse" style="display:none">Aktifkan di HP ini</button>
+      </div>
     </section>
 
     <section class="page" id="page-switch">

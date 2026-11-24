@@ -46,6 +46,9 @@ class Prefs(context: Context) {
             "premium_code" to "",
             "account" to "",
             "accounts" to "[]",
+            // Mode mandiri: akun & saran disimpan di HP
+            "local_users" to "{}",
+            "local_feedback" to "[]",
             "user_name" to "",
             "auto_greet" to true,
             "assistant_lang" to "Indonesia",
@@ -125,8 +128,11 @@ class Prefs(context: Context) {
     fun builtIn(k: String): String = when (k) {
         "server_url" -> BuildConfig.SERVER_URL
         "app_token" -> BuildConfig.APP_TOKEN
-        // Kunci kosong + server aktif → semua lewat server (kunci tidak ada di HP)
-        in KEY_FIELDS -> if (serverOn()) Route.SERVER else ""
+        // Server aktif → semua lewat server. Mode mandiri → kunci tertanam dari build (Termux → GitHub Secrets).
+        "gemini_key" -> if (serverOn()) Route.SERVER else BuildConfig.GEMINI_KEY
+        "openai_key" -> if (serverOn()) Route.SERVER else BuildConfig.OPENAI_KEY
+        "fish_key" -> if (serverOn()) Route.SERVER else BuildConfig.FISH_KEY
+        "tt_api_key" -> if (serverOn()) Route.SERVER else BuildConfig.TIKTOK_KEY
         else -> ""
     }
     fun bool(k: String): Boolean = sp.getBoolean(k, DEFAULTS[k] as? Boolean ?: false)
@@ -153,6 +159,7 @@ class Prefs(context: Context) {
         // true = kunci sudah tertanam otomatis dari build (tidak perlu diisi)
         KEY_FIELDS.forEach { k -> put("builtin_$k", builtIn(k).isNotEmpty()) }
         put("server_active", serverOn())
+        put("premium_secret_set", BuildConfig.PREMIUM_SECRET.isNotEmpty())
         remove("app_token"); remove("server_url")
     }
 

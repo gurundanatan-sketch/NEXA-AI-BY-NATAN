@@ -190,6 +190,7 @@ class NexaBridge(private val act: MainActivity) {
     }
 
     @JavascriptInterface fun testVoice(text: String, engine: String) {
+        if (locked()) return
         scope.launch {
             val err = VoiceOutput(ctx).speak(text, engine.ifBlank { null }, 1f)
             emit("toast", JSONObject().put("text", err?.let { "Suara cadangan dipakai: $it" } ?: "Suara OK"))
@@ -223,7 +224,20 @@ class NexaBridge(private val act: MainActivity) {
     @JavascriptInterface fun saveNotes(json: String) = prefs.put("notes", json)
 
     // ------------------------------------------------------------------ TikTok
-    @JavascriptInterface fun tiktokConnect(username: String) = TikTokLiveManager.connect(act, username)
+    /** Fitur asisten AI terkunci tanpa Premium (mode mandiri). */
+    private fun locked(): Boolean {
+        if (com.natan.nexa.Premium.allowed(prefs)) return false
+        emit("toast", JSONObject().put("text", com.natan.nexa.Premium.LOCKED))
+        return true
+    }
+
+    /** Status kode Premium untuk HP ini (dicek offline). */
+    @JavascriptInterface fun premiumCheck(code: String): String =
+        (com.natan.nexa.Premium.info(code, com.natan.nexa.Route.device) ?: JSONObject().put("invalid", true)).toString()
+    @JavascriptInterface fun premiumAllowed(): Boolean = com.natan.nexa.Premium.allowed(prefs)
+    @JavascriptInterface fun isOwner(): Boolean = com.natan.nexa.Premium.isOwner(prefs)
+
+    @JavascriptInterface fun tiktokConnect(username: String) { if (!locked()) TikTokLiveManager.connect(act, username) }
     @JavascriptInterface fun tiktokDisconnect() = TikTokLiveManager.disconnect(act)
     @JavascriptInterface fun tiktokTest(type: String) = act.runOnUiThread { TikTokLiveManager.test(act, type) }
     @JavascriptInterface fun tiktokPause(paused: Boolean) { TikTokLiveManager.paused = paused }
@@ -234,6 +248,7 @@ class NexaBridge(private val act: MainActivity) {
         prefs.backendUrl, prefs.backendToken)
 
     @JavascriptInterface fun generateImage(prompt: String, enhance: Boolean) {
+        if (locked()) return
         scope.launch {
             emit("busy", JSONObject().put("text", "Membuat gambar…"))
             val r = try { media().generateImage(prompt, enhance) } catch (e: Exception) { "GAGAL: ${e.message}" }
@@ -245,7 +260,7 @@ class NexaBridge(private val act: MainActivity) {
     @JavascriptInterface fun pickAudio(purpose: String) = act.runOnUiThread { act.pickAudio(purpose) }
     @JavascriptInterface fun pickVideoAudio(purpose: String) = act.runOnUiThread { act.pickVideoAudio(purpose) }
 
-    @JavascriptInterface fun makeVideo(json: String): String = try {
+    @JavascriptInterface fun makeVideo(json: String): String = if (!com.natan.nexa.Premium.allowed(prefs)) "ERR:" + com.natan.nexa.Premium.LOCKED else try {
         "OK:" + VideoJobs.start(act, JSONObject(json))
     } catch (e: Exception) { "GAGAL: ${e.message}" }
 
@@ -293,6 +308,7 @@ class NexaBridge(private val act: MainActivity) {
 
     /** json: {name, engine: fish|gemini, sample: path, consent: path, agree: true} → event "cloned". */
     @JavascriptInterface fun cloneVoice(json: String) {
+        if (locked()) return
         scope.launch {
             try {
                 val o = JSONObject(json)
@@ -334,6 +350,7 @@ class NexaBridge(private val act: MainActivity) {
 
     /** Putar contoh suara dari spesifikasi mis. fish:<id>, openai:coral, gemini:Kore. */
     @JavascriptInterface fun previewVoice(spec: String, text: String) {
+        if (locked()) return
         scope.launch {
             val err = try { VoiceOutput(ctx).speakSpec(text, spec); null } catch (e: Exception) { e.message }
             emit("toast", JSONObject().put("text", err?.let { "Gagal: $it" } ?: "Contoh suara selesai"))

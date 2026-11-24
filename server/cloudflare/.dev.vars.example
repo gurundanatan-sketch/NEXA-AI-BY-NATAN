@@ -1,0 +1,4 @@
+GEMINI_KEY=AIza-atau-AQ-kunci-gemini # Kunci Gemini dari **aistudio.google.com/apikey**
+OPENAI_KEY=sk-kunci-openai # Kunci OpenAI dari **platform.openai.com/api-keys** (diawali sk-)
+FISH_KEY=kunci-fish-audio # Kunci Fish Audio dari **fish.audio** (menu API)
+OWNER_PASSWORD=sandi-pembuat-min-8 # Kata sandi PEMBUAT buatanmu sendiri (min. 8 karakter) untuk membuat kode Premium di aplikasi

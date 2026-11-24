@@ -35,6 +35,9 @@ class LiveVoiceService : Service() {
         var onStateChange: ((Boolean) -> Unit)? = null
 
         fun start(context: Context, greet: Boolean = false, command: String = "") {
+            if (!com.natan.nexa.Premium.allowed(com.natan.nexa.Prefs(context))) {
+                com.natan.nexa.agent.AgentRunner.log(com.natan.nexa.Premium.LOCKED); return
+            }
             ContextCompat.startForegroundService(context,
                 Intent(context, LiveVoiceService::class.java)
                     .putExtra(EXTRA_GREET, greet).putExtra(EXTRA_COMMAND, command))

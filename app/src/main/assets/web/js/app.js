@@ -68,7 +68,7 @@
     const sh = $('#serverHint');
     if (sh) sh.innerHTML = S.server_active
       ? '🌐 <b>Server NEXA aktif</b> — semua kunci API (Gemini, OpenAI, Fish Audio, TikTok) diatur dari Termux. Tidak perlu isi apa pun di sini.'
-      : 'Server NEXA belum diatur. Jalankan <b>bash tools/setup_server.sh</b> di Termux agar semua orang bisa memakai aplikasi tanpa isi kunci.';
+      : '🔐 Mode mandiri — kunci API tertanam di aplikasi (diatur pembuat lewat Termux: <b>bash tools/setup_keys.sh</b>). Isi kolom di bawah hanya untuk mengganti kunci di HP ini.';
   }
 
   // ---------------------------------------------------------------- suara Gemini otomatis (satu saklar)

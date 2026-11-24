@@ -1,7 +1,8 @@
 // NEXA AI BY NATAN — server pribadi (Cloudflare Workers, gratis, online 24 jam).
-// Secret (diatur dari Termux: bash tools/setup_server.sh):
-//   GEMINI_KEY, OPENAI_KEY, FISH_KEY, TIKTOK_KEY, APP_TOKEN, PREMIUM_SECRET
+// Cara termudah (tanpa token, lewat browser): tempel file ini di dashboard Cloudflare Workers, lalu isi
+// Secret: GEMINI_KEY, OPENAI_KEY, FISH_KEY, OWNER_PASSWORD (opsional: TIKTOK_KEY, APP_TOKEN, PREMIUM_SECRET)
 // Binding KV: DB  (akun, profil, saran & masukan)
+// Kode Premium dibuat dari aplikasi: Pengaturan → Tentang → Panel pembuat (pakai OWNER_PASSWORD).
 const G = 'https://generativelanguage.googleapis.com';
 const O = 'https://api.openai.com';
 const F = 'https://api.fish.audio';
@@ -16,6 +17,9 @@ function json(o, status = 200) {
 }
 const err = (msg, status = 400) => json({ error: msg }, status);
 const today = () => Math.floor(Date.now() / DAY);
+// Rahasia tanda tangan kode Premium & sesi login (PREMIUM_SECRET, atau diturunkan dari OWNER_PASSWORD).
+const sec = (env) => env.PREMIUM_SECRET || (env.OWNER_PASSWORD ? 'nexa:' + env.OWNER_PASSWORD : '');
+const fails = new Map();
 
 export default {
   async fetch(req, env) {
@@ -93,7 +97,7 @@ async function checkCode(env, device, code) {
   const m = /^NX-([OPG])(\d+)-([0-9A-F]{16})$/.exec(String(code || '').trim().toUpperCase());
   if (!m || !device) return null;
   const [, tier, exp, sig] = m;
-  const want = (await hmacHex(env.PREMIUM_SECRET, `${device}|${tier}|${exp}`)).slice(0, 16).toUpperCase();
+  const want = (await hmacHex(sec(env), `${device}|${tier}|${exp}`)).slice(0, 16).toUpperCase();
   if (want !== sig) return null;
   const e = Number(exp);
   return { tier, exp: e, expired: e !== 0 && e < today() };
@@ -102,18 +106,18 @@ async function checkCode(env, device, code) {
 // Sesi login: <uid>.<hariKedaluwarsa>.<tanda tangan>
 async function makeSession(env, uid) {
   const exp = today() + 365;
-  return `${uid}.${exp}.${(await hmacHex(env.PREMIUM_SECRET, `s|${uid}|${exp}`)).slice(0, 24)}`;
+  return `${uid}.${exp}.${(await hmacHex(sec(env), `s|${uid}|${exp}`)).slice(0, 24)}`;
 }
 async function readSession(env, token) {
   const [uid, exp, sig] = String(token || '').split('.');
   if (!uid || !exp || !sig) return null;
   if (Number(exp) < today()) return null;
-  const want = (await hmacHex(env.PREMIUM_SECRET, `s|${uid}|${exp}`)).slice(0, 24);
+  const want = (await hmacHex(sec(env), `s|${uid}|${exp}`)).slice(0, 24);
   return want === sig ? uid : null;
 }
 
 async function premiumGate(req, env) {
-  if (!env.PREMIUM_SECRET) return null; // premium belum diatur → bebas (mode lama)
+  if (!sec(env)) return null; // premium belum diatur → bebas (mode lama)
   const uid = await readSession(env, req.headers.get('x-nexa-session'));
   if (!uid) return err('Silakan login dulu (email / nomor telepon) untuk memakai NEXA.', 401);
   const c = await checkCode(env, req.headers.get('x-nexa-device'), req.headers.get('x-nexa-code'));
@@ -146,9 +150,30 @@ async function getUser(env, uid) {
 const putUser = (env, u) => env.DB.put('u:' + u.uid, JSON.stringify(u));
 
 async function accountApi(req, env, p) {
-  if (!env.DB) return err('Database akun belum dipasang. Jalankan lagi: bash tools/setup_server.sh', 503);
-  if (!env.PREMIUM_SECRET) return err('Server premium belum diatur. Jalankan lagi: bash tools/setup_server.sh', 503);
+  if (!env.DB) return err('Database akun belum dipasang: tambahkan binding KV bernama DB di Cloudflare.', 503);
+  if (!sec(env)) return err('Server premium belum diatur: isi Secret OWNER_PASSWORD di Cloudflare.', 503);
   const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+
+  // ---------- panel pembuat: buat kode Premium dengan OWNER_PASSWORD (tanpa Termux) ----------
+  if (p === '/premium/owner-code') {
+    const ip = req.headers.get('cf-connecting-ip') || '-';
+    const f = fails.get(ip) || { n: 0, t: 0 };
+    if (f.n >= 5 && Date.now() - f.t < 10 * 60000) return err('Terlalu banyak percobaan salah. Coba lagi 10 menit lagi.', 429);
+    if (!env.OWNER_PASSWORD || String(body.password || '') !== env.OWNER_PASSWORD) {
+      fails.set(ip, { n: f.n + 1, t: Date.now() });
+      return err('Kata sandi pembuat salah.', 403);
+    }
+    fails.delete(ip);
+    const device = String(body.device || '').trim().toUpperCase();
+    if (!device) return err('Isi ID perangkat.');
+    const tier = ['O', 'P', 'G'].includes(body.tier) ? body.tier : 'P';
+    const days = Math.max(0, Math.floor(Number(body.days || 0)));
+    const exp = tier === 'O' ? 0 : tier === 'P' ? today() + 30 : (days ? today() + days : 0);
+    const sig = (await hmacHex(sec(env), `${device}|${tier}|${exp}`)).slice(0, 16).toUpperCase();
+    const code = `NX-${tier}${exp}-${sig}`;
+    await env.DB.put('c:' + Date.now() + '-' + rand(2), JSON.stringify({ code, device, tier, exp, at: Date.now() }));
+    return json({ code, tier, exp });
+  }
 
   // ---------- daftar / masuk ----------
   if (p === '/auth/register' || p === '/auth/login') {
@@ -295,7 +320,7 @@ async function proxyWs(req, target, add) {
 async function health(env, deep) {
   const has = {
     gemini: !!env.GEMINI_KEY, openai: !!env.OPENAI_KEY, fish: !!env.FISH_KEY, tiktok: !!env.TIKTOK_KEY,
-    akun: !!env.DB, premium: !!env.PREMIUM_SECRET,
+    akun: !!env.DB, premium: !!sec(env),
   };
   if (!deep) return json(has);
   const test = async (ok, url, headers) => {

@@ -52,6 +52,7 @@ object AgentRunner {
     }
 
     fun submit(context: Context, text: String) {
+        if (!com.natan.nexa.Premium.allowed(com.natan.nexa.Prefs(context))) { log(com.natan.nexa.Premium.LOCKED); return }
         if (isBusy) { log("Masih mengerjakan tugas sebelumnya. Tekan Stop dulu."); return }
         val app = context.applicationContext
         val prefs = Prefs(app)

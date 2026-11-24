@@ -6,6 +6,16 @@ Asisten AI super-agent untuk Android. NEXA bisa **ngobrol real-time dua arah (da
 
 ---
 
+## 🆕 Versi 7.0 — Mode mandiri (tanpa server luar)
+
+- Aplikasi berjalan sendiri: langsung memanggil Gemini, OpenAI, dan Fish Audio dari HP. Tidak perlu Cloudflare.
+- Kunci API diatur dari Termux: `bash tools/setup_keys.sh`. Kunci tertanam ke APK saat build. Di aplikasi, menu
+  **🔐 Kunci API** hanya muncul untuk **pembuat aplikasi** (kode NX-O…), tidak untuk pengguna gratis atau pelanggan Premium.
+- Kode Premium dibuat di Termux: `bash tools/buat_kode.sh`, lalu dicek offline di aplikasi. Premium hanya mengunci fitur asisten AI.
+- Akun (email/nomor HP + kata sandi) tersimpan di HP. Saran & masukan dikirim langsung ke WhatsApp pembuat (085176894962).
+- ⚠️ Karena tanpa server, kunci API dan rahasia Premium ada di dalam APK dan bisa dibongkar oleh orang yang paham.
+  Pantau pemakaian di dashboard penyedia. Ganti kunci kapan saja: `bash tools/setup_keys.sh`.
+
 ## 🆕 Versi 6.0
 
 - **Akun:** login/daftar dengan email atau nomor telepon, foto profil, nama panggilan, username, bio, beralih akun, keluar.
