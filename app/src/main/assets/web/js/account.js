@@ -410,10 +410,11 @@
   $('#setBack').addEventListener('click', () => showCat(null));
   function renderPerms() {
     let p = {}; try { p = JSON.parse(A.permStatus()); } catch (e) { p = {}; }
-    const rows = [['mic', 'Mikrofon'], ['overlay', 'Tampil di atas aplikasi lain'], ['accessibility', 'Aksesibilitas'],
+    const rows = [['mic', 'Mikrofon'], ['media', 'Akses audio & video galeri'], ['overlay', 'Tampil di atas aplikasi lain'], ['accessibility', 'Aksesibilitas'],
       ['notifications', 'Akses notifikasi'], ['battery', 'Bebas hemat baterai']];
     $('#permList').innerHTML = rows.map(([k, t]) => `<div class="hint" style="margin:3px 0">${p[k] ? '✅' : '⚪'} ${t}</div>`).join('');
   }
+  $('#permMedia').addEventListener('click', () => { A.requestPermissions(); setTimeout(renderPerms, 2500); });
   $('#askAbout').addEventListener('click', () => {
     if (!premiumOK()) { toast('Fitur ini khusus Premium'); return go('premium'); }
     A.liveStart('[INFO SISTEM] Pengguna minta kamu menjelaskan seluruh fungsi, keunggulan, dan manfaat aplikasi NEXA, ' +

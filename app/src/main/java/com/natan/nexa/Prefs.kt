@@ -6,7 +6,7 @@ import org.json.JSONObject
 /**
  * Semua pengaturan NEXA disimpan di HP (SharedPreferences).
  * UI (assets/web) membaca & menulis lewat toJson()/applyJson().
- * Semua kunci API (Gemini, OpenAI, Fish Audio, TikTok) disimpan di sini — aplikasi berjalan mandiri tanpa Termux.
+ * Semua kunci API (Gemini, ElevenLabs, Fish Audio, TikTok) disimpan di sini — aplikasi berjalan mandiri tanpa Termux.
  */
 class Prefs(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("nexa", Context.MODE_PRIVATE)
@@ -30,7 +30,7 @@ class Prefs(context: Context) {
     companion object {
         /** key → nilai default. Tipe default menentukan tipe penyimpanan. */
         /** Kolom kunci API: di layar ditampilkan kosong bila memakai kunci bawaan. */
-        val KEY_FIELDS = setOf("gemini_key", "openai_key", "fish_key", "tt_api_key")
+        val KEY_FIELDS = setOf("gemini_key", "eleven_key", "fish_key", "tt_api_key")
         val DEFAULTS: Map<String, Any> = linkedMapOf(
             // --- Asisten ---
             "assistant_name" to "Nexa",
@@ -53,9 +53,9 @@ class Prefs(context: Context) {
             "auto_greet" to true,
             "assistant_lang" to "Indonesia",
             "voice_spec" to "",
-            // Suara Live: "gemini:Kore" (Gemini Live) atau "openai:marin" (OpenAI Realtime)
+            // Suara Live: "gemini:Kore" (suara Gemini) atau "eleven:<id>" / "fish:<id>" (suara pilihan/kloning)
             "live_voice_spec" to "",
-            "openai_live_model" to "gpt-realtime-2.1",
+            "eleven_live_model" to "eleven_flash_v2_5",
             "gemini_key" to "",
             "agent_model" to "gemini-3.8-flash",
             "live_model" to "gemini-3.8-live",
@@ -68,18 +68,18 @@ class Prefs(context: Context) {
             "image_model" to "gemini-3.1-flash-image",
             "enhance_prompt" to true,
             // --- Kunci API lain (semua tersimpan di HP, tanpa server) ---
-            "openai_key" to "",
+            "eleven_key" to "",
             "fish_key" to "",
             "fish_model" to "s2.1-pro",           // s2.1-pro | s2.1-pro-free | s2-pro
-            "openai_tts_model" to "gpt-4o-mini-tts",
-            "openai_stt_model" to "whisper-1",
+            "eleven_model" to "eleven_v3",
+            "eleven_voices_cache" to "[]",
             // --- Suara mode perintah ---
-            "voice_engine" to "gemini",          // gemini | openai | fish | android | sovits
+            "voice_engine" to "gemini",          // gemini | eleven | fish | android | sovits
             "tts_model" to "gemini-3.8-flash-tts",
             "tts_voice" to "Kore",
-            "openai_voice" to "coral",
+            "eleven_voice" to "EXAVITQu4vr4xnSDxMaL",
             "fish_voice" to "",                  // reference_id suara Fish (kloning)
-            "video_voice" to "gemini:Kore",      // gemini:Kore | openai:coral | fish:<id>
+            "video_voice" to "gemini:Kore",      // gemini:Kore | eleven:<id> | fish:<id>
             "voices" to "[]",                    // suara kloning tersimpan
             // --- GPT-SoVITS (opsional, PC) ---
             "sovits_url" to "",
@@ -91,7 +91,7 @@ class Prefs(context: Context) {
             "tt_api_key" to "",
             "tt_bridge" to "ws://127.0.0.1:8090",
             "tt_username" to "",
-            "tt_engine" to "android",            // android | gemini | openai | fish
+            "tt_engine" to "android",            // android | gemini | eleven | fish
             "tt_rate" to 1.05f,
             "tt_on_follow" to true,
             "tt_on_like" to true,
@@ -130,7 +130,7 @@ class Prefs(context: Context) {
         "app_token" -> BuildConfig.APP_TOKEN
         // Server aktif → semua lewat server. Mode mandiri → kunci tertanam dari build (Termux → GitHub Secrets).
         "gemini_key" -> if (serverOn()) Route.SERVER else BuildConfig.GEMINI_KEY
-        "openai_key" -> if (serverOn()) Route.SERVER else BuildConfig.OPENAI_KEY
+        "eleven_key" -> if (serverOn()) Route.SERVER else BuildConfig.ELEVEN_KEY
         "fish_key" -> if (serverOn()) Route.SERVER else BuildConfig.FISH_KEY
         "tt_api_key" -> if (serverOn()) Route.SERVER else BuildConfig.TIKTOK_KEY
         else -> ""
@@ -176,7 +176,7 @@ class Prefs(context: Context) {
     val geminiAuto: Boolean get() = bool("gemini_voice_auto") && geminiApiKey.isNotEmpty()
     /** Suara Live (Gemini native audio hanya mendukung suara Gemini). */
     val autoVoice: String get() = str("gemini_voice").ifBlank { "Kore" }
-    /** Suara pilihan untuk asisten & video: "gemini:Kore" | "openai:marin" | "fish:<id>". */
+    /** Suara pilihan untuk asisten & video: "gemini:Kore" | "eleven:<id>" | "fish:<id>". */
     val autoSpec: String get() = str("voice_spec").ifBlank { "gemini:$autoVoice" }
     var liveVoice: String
         get() = str("live_voice_spec").takeIf { it.startsWith("gemini:") }?.substringAfter(':')
@@ -191,9 +191,9 @@ class Prefs(context: Context) {
     var geminiVoice: String
         get() = if (geminiAuto) (if (autoSpec.startsWith("gemini:")) autoSpec.substringAfter(':') else autoVoice) else str("tts_voice")
         set(v) = put("tts_voice", v)
-    /** Suara OpenAI aktif (mode otomatis memakai pilihan di daftar suara). */
-    val openaiVoice: String
-        get() = if (geminiAuto && autoSpec.startsWith("openai:")) autoSpec.substringAfter(':') else str("openai_voice")
+    /** Suara ElevenLabs aktif (mode otomatis memakai pilihan di daftar suara). */
+    val elevenVoice: String
+        get() = if (geminiAuto && autoSpec.startsWith("eleven:")) autoSpec.substringAfter(':') else str("eleven_voice")
     val fishVoice: String
         get() = if (geminiAuto && autoSpec.startsWith("fish:")) autoSpec.substringAfter(':') else str("fish_voice")
     val videoVoice: String get() = if (geminiAuto) autoSpec else str("video_voice")
@@ -203,7 +203,7 @@ class Prefs(context: Context) {
     var sovitsLang: String get() = str("sovits_lang"); set(v) = put("sovits_lang", v)
     var backendUrl: String get() = str("backend_url").trimEnd('/'); set(v) = put("backend_url", v)
     var backendToken: String get() = str("backend_token"); set(v) = put("backend_token", v)
-    val openaiKey: String get() = str("openai_key")
+    val elevenKey: String get() = str("eleven_key")
     val fishKey: String get() = str("fish_key")
     val assistantName: String get() = str("assistant_name").ifBlank { "Nexa" }
 }

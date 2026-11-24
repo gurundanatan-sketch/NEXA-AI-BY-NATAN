@@ -127,22 +127,29 @@ class StudioApi(private val p: Prefs) {
     data class Word(val start: Double, val end: Double, val word: String)
     data class Segment(val start: Double, val end: Double, val text: String, val words: List<Word>)
 
-    /** OpenAI whisper (timestamp kata) → Fish Audio ASR → Gemini, mana yang tersedia. */
+    /** ElevenLabs Scribe: teks + waktu per kata. */
+    private fun scribe(audio: File): List<Word> {
+        var last: Exception? = null
+        for (m in listOf("scribe_v2", "scribe_v1")) {
+            try {
+                val res = JSONObject(String(Http.upload("https://api.elevenlabs.io/v1/speech-to-text", audio, "file",
+                    listOf("model_id" to m, "language_code" to "ind", "timestamps_granularity" to "word"),
+                    mapOf("xi-api-key" to p.elevenKey))))
+                val w = res.optJSONArray("words") ?: return emptyList()
+                return (0 until w.length()).mapNotNull { k ->
+                    val o = w.getJSONObject(k)
+                    if (o.optString("type", "word") != "word") null
+                    else Word(o.optDouble("start"), o.optDouble("end"), o.optString("text"))
+                }
+            } catch (e: Exception) { last = e }
+        }
+        throw last ?: RuntimeException("Scribe gagal")
+    }
+
+    /** ElevenLabs Scribe (timestamp kata) → Fish Audio ASR → Gemini, mana yang tersedia. */
     fun transcribe(audio: File): List<Segment> {
-        if (p.openaiKey.isNotBlank()) try {
-            val res = JSONObject(String(Http.upload("https://api.openai.com/v1/audio/transcriptions", audio, "file",
-                listOf("model" to p.str("openai_stt_model"), "response_format" to "verbose_json", "language" to "id",
-                    "timestamp_granularities[]" to "segment", "timestamp_granularities[]" to "word"),
-                mapOf("Authorization" to "Bearer ${p.openaiKey}"))))
-            val words = res.optJSONArray("words")?.let { w ->
-                (0 until w.length()).map { val o = w.getJSONObject(it); Word(o.getDouble("start"), o.getDouble("end"), o.getString("word")) }
-            } ?: emptyList()
-            val segs = res.optJSONArray("segments")
-            if (segs != null && segs.length() > 0) return (0 until segs.length()).map {
-                val s = segs.getJSONObject(it)
-                val a = s.getDouble("start"); val b = s.getDouble("end")
-                Segment(a, b, s.getString("text").trim(), words.filter { w -> w.start >= a - 0.01 && w.start < b })
-            }
+        if (p.elevenKey.isNotBlank()) try {
+            val words = scribe(audio)
             if (words.isNotEmpty()) return groupWords(words)
         } catch (_: Exception) { /* coba mesin berikutnya */ }
 
@@ -186,17 +193,23 @@ class StudioApi(private val p: Prefs) {
         return out
     }
 
-    /** Timestamp kata untuk audio TTS (bila ada kunci OpenAI) → subtitle sinkron kata. */
+    /** Timestamp kata untuk audio TTS (bila ada kunci ElevenLabs) → subtitle sinkron kata. */
     fun wordTimes(audio: File): List<Word> {
-        if (p.openaiKey.isBlank()) return emptyList()
-        return try {
-            val res = JSONObject(String(Http.upload("https://api.openai.com/v1/audio/transcriptions", audio, "file",
-                listOf("model" to p.str("openai_stt_model"), "response_format" to "verbose_json",
-                    "timestamp_granularities[]" to "word"),
-                mapOf("Authorization" to "Bearer ${p.openaiKey}"))))
-            val w = res.optJSONArray("words") ?: return emptyList()
-            (0 until w.length()).map { val o = w.getJSONObject(it); Word(o.getDouble("start"), o.getDouble("end"), o.getString("word")) }
-        } catch (e: Exception) { emptyList() }
+        if (p.elevenKey.isBlank()) return emptyList()
+        return try { scribe(audio) } catch (e: Exception) { emptyList() }
+    }
+
+    // ------------------------------------------------------------------ kloning suara ElevenLabs
+    /** Instant Voice Clone: POST /v1/voices/add. Mengembalikan voice_id. */
+    fun cloneEleven(sample: File, name: String): String {
+        require(p.elevenKey.isNotBlank()) { "Kunci ElevenLabs belum diatur (Termux: bash tools/setup_keys.sh)" }
+        val res = JSONObject(String(Http.upload("https://api.elevenlabs.io/v1/voices/add", sample, "files",
+            listOf("name" to name, "remove_background_noise" to "true",
+                "description" to "Suara kloning dari aplikasi NEXA AI BY NATAN"),
+            mapOf("xi-api-key" to p.elevenKey))))
+        return res.optString("voice_id").ifBlank {
+            throw RuntimeException("ElevenLabs tidak mengembalikan voice_id: ${res.toString().take(200)}")
+        }
     }
 
     // ------------------------------------------------------------------ kloning suara Fish Audio

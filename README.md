@@ -6,6 +6,17 @@ Asisten AI super-agent untuk Android. NEXA bisa **ngobrol real-time dua arah (da
 
 ---
 
+## 🆕 Versi 7.1
+
+- OpenAI dihapus dan diganti **ElevenLabs**: suara paling natural (Eleven v3, dengan cadangan otomatis ke Multilingual v2 dan Flash v2.5),
+  18 suara siap pakai plus suara dari akun ElevenLabs, kloning suara instan, dan transkrip Scribe (subtitle per kata).
+  Kunci diisi dari Termux: `bash tools/setup_keys.sh` (pertanyaan nomor 2).
+- **Suara kloning di Live:** Live tetap memakai otak Gemini, tapi suaranya bisa diganti suara ElevenLabs, Fish Audio, atau suara kloning
+  (diucapkan per kalimat, dan tetap bisa disela).
+- **Impor audio & video dari galeri** untuk kloning suara, narasi suara asli video, dan musik latar, plus izin akses audio & video galeri.
+- **Suara lebih natural:** pengaturan ekspresif ElevenLabs, tag emosi v3, instruksi gaya bicara Gemini, dan jalur resmi Gemini TTS sebagai cadangan.
+- Live otomatis mencoba **model cadangan** bila model pilihan tidak tersedia untuk kunci Gemini.
+
 ## 🆕 Versi 7.0 — Mode mandiri (tanpa server luar)
 
 - Aplikasi berjalan sendiri: langsung memanggil Gemini, OpenAI, dan Fish Audio dari HP. Tidak perlu Cloudflare.

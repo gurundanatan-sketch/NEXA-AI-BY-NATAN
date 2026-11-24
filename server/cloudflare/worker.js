@@ -1,10 +1,10 @@
 // NEXA AI BY NATAN — server pribadi (Cloudflare Workers, gratis, online 24 jam).
 // Cara termudah (tanpa token, lewat browser): tempel file ini di dashboard Cloudflare Workers, lalu isi
-// Secret: GEMINI_KEY, OPENAI_KEY, FISH_KEY, OWNER_PASSWORD (opsional: TIKTOK_KEY, APP_TOKEN, PREMIUM_SECRET)
+// Secret: GEMINI_KEY, ELEVEN_KEY, FISH_KEY, OWNER_PASSWORD (opsional: TIKTOK_KEY, APP_TOKEN, PREMIUM_SECRET)
 // Binding KV: DB  (akun, profil, saran & masukan)
 // Kode Premium dibuat dari aplikasi: Pengaturan → Tentang → Panel pembuat (pakai OWNER_PASSWORD).
 const G = 'https://generativelanguage.googleapis.com';
-const O = 'https://api.openai.com';
+const O = 'https://api.elevenlabs.io';
 const F = 'https://api.fish.audio';
 const LIVE = G + '/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
 const DAY = 86400000;
@@ -48,10 +48,6 @@ export default {
       const gate = await premiumGate(req, env);
       if (gate) return gate;
 
-      if (p === '/openai-ws') {
-        const model = url.searchParams.get('model') || 'gpt-realtime-2.1';
-        return proxyWs(req, O + '/v1/realtime?model=' + encodeURIComponent(model), { Authorization: 'Bearer ' + (env.OPENAI_KEY || '') });
-      }
       if (p === '/gemini-ws') return proxyWs(req, LIVE + '?key=' + encodeURIComponent(env.GEMINI_KEY || ''), {});
       if (p === '/tiktok-ws') {
         const base = url.searchParams.get('provider') === 'tiktool' ? 'https://api.tik.tools' : 'https://ws.eulerstream.com';
@@ -61,7 +57,7 @@ export default {
         return proxyWs(req, t.toString(), {});
       }
       if (p.startsWith('/gemini/')) return forward(req, G + p.slice(7) + url.search, { 'x-goog-api-key': env.GEMINI_KEY || '' });
-      if (p.startsWith('/openai/')) return forward(req, O + p.slice(7) + url.search, { authorization: 'Bearer ' + (env.OPENAI_KEY || '') });
+      if (p.startsWith('/eleven/')) return forward(req, O + p.slice(7) + url.search, { 'xi-api-key': env.ELEVEN_KEY || '' });
       if (p.startsWith('/fish/')) return forward(req, F + p.slice(5) + url.search, { authorization: 'Bearer ' + (env.FISH_KEY || '') });
       return err('not found', 404);
     } catch (e) {
@@ -288,7 +284,7 @@ async function accountApi(req, env, p) {
 // ======================================================================= proxy AI
 async function forward(req, target, add) {
   const h = new Headers(req.headers);
-  ['x-nexa-app', 'x-nexa-session', 'x-nexa-device', 'x-nexa-code', 'host', 'authorization', 'x-goog-api-key',
+  ['x-nexa-app', 'x-nexa-session', 'x-nexa-device', 'x-nexa-code', 'host', 'authorization', 'x-goog-api-key', 'xi-api-key',
     'cf-connecting-ip', 'x-forwarded-for', 'x-real-ip'].forEach((x) => h.delete(x));
   for (const [k, v] of Object.entries(add)) h.set(k, v);
   const hasBody = !['GET', 'HEAD'].includes(req.method);
@@ -319,7 +315,7 @@ async function proxyWs(req, target, add) {
 
 async function health(env, deep) {
   const has = {
-    gemini: !!env.GEMINI_KEY, openai: !!env.OPENAI_KEY, fish: !!env.FISH_KEY, tiktok: !!env.TIKTOK_KEY,
+    gemini: !!env.GEMINI_KEY, eleven: !!env.ELEVEN_KEY, fish: !!env.FISH_KEY, tiktok: !!env.TIKTOK_KEY,
     akun: !!env.DB, premium: !!sec(env),
   };
   if (!deep) return json(has);
@@ -332,7 +328,7 @@ async function health(env, deep) {
   };
   return json({
     gemini: await test(has.gemini, G + '/v1beta/models?pageSize=1', { 'x-goog-api-key': env.GEMINI_KEY }),
-    openai: await test(has.openai, O + '/v1/models', { authorization: 'Bearer ' + env.OPENAI_KEY }),
+    eleven: await test(has.eleven, O + '/v1/user', { 'xi-api-key': env.ELEVEN_KEY }),
     fish: await test(has.fish, F + '/model?page_size=1', { authorization: 'Bearer ' + env.FISH_KEY }),
     tiktok: has.tiktok ? 'ok' : 'kosong',
     akun: has.akun ? 'ok' : 'kosong',

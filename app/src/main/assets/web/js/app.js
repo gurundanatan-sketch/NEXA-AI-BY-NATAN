@@ -54,7 +54,7 @@
     syncGeminiAuto();
     // Kunci tertanam otomatis → tampilkan status, kolom boleh kosong
     // Server NEXA aktif → kolom kunci disembunyikan (semua kunci diatur dari Termux)
-    [['gemini_key', 'AIza…'], ['openai_key', 'sk-…'], ['fish_key', '…'], ['tt_api_key', 'dari eulerstream.com atau tik.tools']].forEach(([k, ph]) => {
+    [['gemini_key', 'AIza…'], ['eleven_key', '…'], ['fish_key', '…'], ['tt_api_key', 'dari eulerstream.com atau tik.tools']].forEach(([k, ph]) => {
       const el = $(`[data-pref="${k}"]`);
       if (!el) return;
       el.placeholder = S['builtin_' + k] ? '✓ Terpasang otomatis' : ph;
@@ -67,7 +67,7 @@
     });
     const sh = $('#serverHint');
     if (sh) sh.innerHTML = S.server_active
-      ? '🌐 <b>Server NEXA aktif</b> — semua kunci API (Gemini, OpenAI, Fish Audio, TikTok) diatur dari Termux. Tidak perlu isi apa pun di sini.'
+      ? '🌐 <b>Server NEXA aktif</b> — semua kunci API (Gemini, ElevenLabs, Fish Audio, TikTok) diatur dari Termux. Tidak perlu isi apa pun di sini.'
       : '🔐 Mode mandiri — kunci API tertanam di aplikasi (diatur pembuat lewat Termux: <b>bash tools/setup_keys.sh</b>). Isi kolom di bawah hanya untuk mengganti kunci di HP ini.';
   }
 
@@ -98,7 +98,7 @@
     const v = e.target.value, part = { live_voice_spec: v };
     if (v.startsWith('gemini:')) part.gemini_voice = v.slice(7);
     save(part);
-    toast(`Suara Live: ${v.split(':')[1]} ✓` + (v.startsWith('openai:') ? ' (OpenAI Realtime)' : '') + (status.live ? ' — matikan & nyalakan Live lagi' : ''));
+    toast(`Suara Live: ${v.split(':')[1]} ✓` + (v.startsWith('gemini:') ? '' : ' (otak Gemini + suara pilihanmu)') + (status.live ? ' — matikan & nyalakan Live lagi' : ''));
   });
   $('#gVoiceNew').addEventListener('click', () => {
     go('studio');
@@ -107,8 +107,8 @@
   });
   $('#checkKeys').addEventListener('click', () => { $('#keysResult').innerHTML = '<div class="hint">Mengecek…</div>'; A.checkKeys(); });
   function renderKeys(d) {
-    const names = d.server ? { server: 'Server NEXA', gemini: 'Gemini (AI Studio)', openai: 'OpenAI', fish: 'Fish Audio', tiktok: 'TikTok LIVE' }
-      : { gemini: 'Gemini (AI Studio)', openai: 'OpenAI', fish: 'Fish Audio', tiktok: 'TikTok LIVE' };
+    const names = d.server ? { server: 'Server NEXA', gemini: 'Gemini (AI Studio)', eleven: 'ElevenLabs', fish: 'Fish Audio', tiktok: 'TikTok LIVE' }
+      : { gemini: 'Gemini (AI Studio)', eleven: 'ElevenLabs', fish: 'Fish Audio', tiktok: 'TikTok LIVE' };
     $('#keysResult').innerHTML = Object.keys(names).map((k) => {
       const v = d[k] || 'kosong';
       const ic = v === 'ok' ? '✅' : v === 'kosong' ? '⚪' : '❌';
@@ -363,6 +363,7 @@
   $('#cRec').addEventListener('click', (e) => recToggle(e.currentTarget, 'sample'));
   $('#cConsentRec').addEventListener('click', (e) => recToggle(e.currentTarget, 'consent'));
   $('#vOwnFile').addEventListener('click', () => A.pickAudio('own'));
+  $('#vOwnVideo').addEventListener('click', () => (A.pickVideoAudio ? A.pickVideoAudio('own') : A.pickAudio('own')));
   $('#cFile').addEventListener('click', () => A.pickAudio('sample'));
   $('#cVideo').addEventListener('click', () => (A.pickVideoAudio ? A.pickVideoAudio('sample') : A.pickAudio('sample')));
   $('#cConsentFile').addEventListener('click', () => A.pickAudio('consent'));
@@ -448,6 +449,10 @@
     const cl = $('#gVoiceClones');
     if (cl) {
       cl.innerHTML = voices.filter((v) => v.cloned).map((v) => `<option value="${esc(v.id)}">🧬 ${esc(v.name)}</option>`).join('');
+      const lc = $('#gLiveClones');
+      if (lc) lc.innerHTML = voices.filter((v) => v.cloned && !v.id.startsWith('gemini:'))
+        .map((v) => `<option value="${esc(v.id)}">🧬 ${esc(v.name)}</option>`).join('');
+      if ($('#gLiveVoice')) $('#gLiveVoice').value = S.live_voice_spec || ('gemini:' + (S.gemini_voice || 'Kore'));
       if (S.voice_spec) $('#gVoice').value = S.voice_spec;
     }
     renderChars();
@@ -461,7 +466,7 @@
     $$('[data-vdef]').forEach((b) => b.addEventListener('click', () => {
       const id = b.dataset.vdef, part = { video_voice: id };
       if (id.startsWith('fish:')) Object.assign(part, { fish_voice: id.slice(5), voice_engine: 'fish', gemini_voice_auto: false });
-      if (id.startsWith('openai:')) Object.assign(part, { openai_voice: id.slice(7), voice_engine: 'openai', gemini_voice_auto: false });
+      if (id.startsWith('eleven:')) Object.assign(part, { eleven_voice: id.slice(7), voice_engine: 'eleven', gemini_voice_auto: false });
       if (id.startsWith('gemini:')) Object.assign(part, { tts_voice: id.slice(7), voice_engine: 'gemini', gemini_voice: id.slice(7) });
       if (S.gemini_voice_auto !== false) { part.voice_spec = id; delete part.gemini_voice_auto; delete part.voice_engine; }
       save(part); syncGeminiAuto(); toast('Jadi suara default video & asisten ★');

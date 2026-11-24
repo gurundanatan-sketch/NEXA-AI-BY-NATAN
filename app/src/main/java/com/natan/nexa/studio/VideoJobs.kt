@@ -20,7 +20,7 @@ import java.util.UUID
  *
  * Permintaan (JSON, sama seperti versi server):
  *   script | topic + duration_min | voice="own" + own_audio (path)
- *   voice: "gemini:Kore" | "openai:coral" | "fish:<id kloning>"
+ *   voice: "gemini:Kore" | "eleven:<id>" | "fish:<id kloning>"
  *   mode: images | clips   aspect: 9:16 | 16:9 | 1:1   subtitles: bool   bgm: path   bgm_volume: 0..1
  */
 object VideoJobs {
@@ -125,7 +125,7 @@ object VideoJobs {
         } else {
             // ---------------- NASKAH / TOPIK + SUARA AI / KLONING ----------------
             var script = req.optString("script").trim()
-            // Banyak tokoh = banyak suara: [{name, voice:"gemini:Puck|openai:marin|fish:<id>", style}]
+            // Banyak tokoh = banyak suara: [{name, voice:"gemini:Puck|eleven:<id>|fish:<id>", style}]
             val chars = linkedMapOf<String, Pair<String, String>>()
             req.optJSONArray("characters")?.let { arr ->
                 for (k in 0 until arr.length()) {

@@ -34,6 +34,43 @@ class GeminiTts(
     private val style: String = "hangat, ramah, natural",
 ) : TtsEngine {
     override suspend fun synthesize(text: String): ByteArray = withContext(Dispatchers.IO) {
+        try { interactions(text) } catch (e: Exception) {
+            val m = e.message.orEmpty()
+            if ("API_KEY" in m || "401" in m || "429" in m) throw e
+            generateContent(text)
+        }
+    }
+
+    /** Jalur resmi Gemini TTS: generateContent → PCM 24 kHz, dibungkus WAV agar bisa diputar. */
+    private fun generateContent(text: String): ByteArray {
+        val body = JSONObject()
+            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject()
+                .put("text", "Ucapkan dengan gaya $style. Natural seperti manusia: intonasi hidup, jeda wajar, " +
+                    "emosi sesuai isi, tidak kaku dan tidak seperti robot:\n$text")))))
+            .put("generationConfig", JSONObject()
+                .put("responseModalities", JSONArray().put("AUDIO"))
+                .put("speechConfig", JSONObject().put("voiceConfig", JSONObject()
+                    .put("prebuiltVoiceConfig", JSONObject().put("voiceName", voice)))))
+        val resp = JSONObject(String(Http.post(
+            "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent",
+            body, mapOf("x-goog-api-key" to apiKey), 180_000)))
+        val part = resp.optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")
+            ?.optJSONArray("parts")?.optJSONObject(0)?.optJSONObject("inlineData")
+            ?: throw RuntimeException("Gemini TTS tidak mengembalikan audio: ${resp.toString().take(160)}")
+        val pcm = Base64.decode(part.optString("data"), Base64.DEFAULT)
+        val rate = Regex("rate=(\\d+)").find(part.optString("mimeType"))?.groupValues?.get(1)?.toIntOrNull() ?: 24_000
+        return wav(pcm, rate)
+    }
+
+    private fun wav(pcm: ByteArray, rate: Int): ByteArray {
+        val b = java.nio.ByteBuffer.allocate(44 + pcm.size).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        b.put("RIFF".toByteArray()).putInt(36 + pcm.size).put("WAVE".toByteArray())
+            .put("fmt ".toByteArray()).putInt(16).putShort(1).putShort(1).putInt(rate).putInt(rate * 2)
+            .putShort(2).putShort(16).put("data".toByteArray()).putInt(pcm.size).put(pcm)
+        return b.array()
+    }
+
+    private fun interactions(text: String): ByteArray {
         val body = JSONObject()
             .put("model", model)
             .put("input", JSONArray().put(JSONObject()
@@ -50,7 +87,7 @@ class GeminiTts(
             "https://generativelanguage.googleapis.com/v1beta/interactions",
             body, mapOf("x-goog-api-key" to apiKey))))
         val b64 = lastAudio(resp) ?: throw RuntimeException("Gemini TTS tidak mengembalikan audio")
-        Base64.decode(b64, Base64.DEFAULT)
+        return Base64.decode(b64, Base64.DEFAULT)
     }
 
     private fun lastAudio(resp: JSONObject): String? {
@@ -69,23 +106,71 @@ class GeminiTts(
 }
 
 // -------------------------------------------------------------------------
-// 2) OPENAI TTS — langsung dari HP
+// 2) ELEVENLABS TTS — suara paling natural & suara kloning (voice_id)
 // -------------------------------------------------------------------------
-class OpenAiTts(
+class ElevenTts(
     private val apiKey: String,
-    private val model: String,   // gpt-4o-mini-tts
-    private val voice: String,   // coral, alloy, ash, ballad, echo, fable, nova, onyx, sage, shimmer, verse, marin, cedar
+    private val model: String,     // eleven_v3 | eleven_multilingual_v2 | eleven_flash_v2_5 | eleven_v4 …
+    private val voiceId: String,
     private val style: String = "",
 ) : TtsEngine {
-    override suspend fun synthesize(text: String): ByteArray = withContext(Dispatchers.IO) {
-        Http.post("https://api.openai.com/v1/audio/speech", JSONObject()
-            .put("model", model).put("voice", voice).put("input", text)
-            .put("response_format", "mp3")
-            .put("instructions", "Bicara seperti manusia sungguhan, natural dan tidak kaku: intonasi hidup, " +
-                "jeda wajar, emosi sesuai isi kalimat (senang, kaget, sedih, bercanda). Logat Indonesia yang luwes. " +
-                "Gaya: ${style.ifBlank { "hangat, ramah, natural" }}."),
-            mapOf("Authorization" to "Bearer $apiKey"))
+    companion object {
+        /** Urutan cadangan bila model pilihan tidak tersedia untuk akun ini. */
+        val MODELS = listOf("eleven_v3", "eleven_multilingual_v2", "eleven_flash_v2_5")
+        @Volatile private var working: String? = null
+        const val DEFAULT_VOICE = "EXAVITQu4vr4xnSDxMaL"   // Sarah
     }
+
+    /** Pengaturan suara yang ekspresif & tidak kaku (stabilitas rendah-sedang = intonasi lebih hidup). */
+    private fun settings(m: String): JSONObject {
+        val calm = "tenang" in style || "lembut" in style || "berbisik" in style || "profesional" in style
+        return JSONObject()
+            .put("stability", if (m == "eleven_v3") 0.5 else if (calm) 0.5 else 0.35)
+            .put("similarity_boost", 0.8)
+            .put("style", if (m == "eleven_v3") 0.0 else if (calm) 0.25 else 0.5)
+            .put("use_speaker_boost", true)
+            .put("speed", 1.0)
+    }
+
+    /** Eleven v3 memahami tag emosi seperti [laughs] [excited] [whispers] → lebih manusiawi. */
+    private fun prepare(text: String, m: String): String {
+        if (m != "eleven_v3") return text
+        val tag = when {
+            "ceria" in style || "bersemangat" in style || "kocak" in style -> "[cheerful] "
+            "sedih" in style -> "[sad] "
+            "berbisik" in style || "misterius" in style -> "[whispers] "
+            "marah" in style -> "[angry] "
+            "dramatis" in style -> "[dramatic] "
+            else -> ""
+        }
+        return tag + text.replace(Regex("(?i)\\b(haha+|wkwk+|hehe+)\\b"), "[laughs] $1")
+    }
+
+    private fun call(text: String, format: String): ByteArray {
+        val order = listOfNotNull(working?.takeIf { it == model }, model.ifBlank { null }) + MODELS
+        var last: Exception? = null
+        for (m in order.distinct()) {
+            try {
+                val body = JSONObject().put("text", prepare(text, m)).put("model_id", m)
+                    .put("voice_settings", settings(m))
+                if (m != "eleven_v3") body.put("language_code", "id")
+                val out = Http.post("https://api.elevenlabs.io/v1/text-to-speech/${voiceId.ifBlank { DEFAULT_VOICE }}" +
+                    "?output_format=$format", body, mapOf("xi-api-key" to apiKey), 180_000)
+                working = m
+                return out
+            } catch (e: Exception) {
+                last = e
+                val msg = e.message.orEmpty()
+                if ("401" in msg || "quota" in msg.lowercase() || "voice_not_found" in msg) break
+            }
+        }
+        throw last ?: RuntimeException("ElevenLabs gagal")
+    }
+
+    override suspend fun synthesize(text: String): ByteArray = withContext(Dispatchers.IO) { call(text, "mp3_44100_128") }
+
+    /** PCM 16-bit mono 24 kHz untuk Live. */
+    fun pcm24k(text: String): ByteArray = call(text, "pcm_24000")
 }
 
 // -------------------------------------------------------------------------
@@ -98,10 +183,18 @@ class FishTts(
 ) : TtsEngine {
     override suspend fun synthesize(text: String): ByteArray = withContext(Dispatchers.IO) {
         // Lebih ekspresif & tidak monoton (natural seperti manusia)
-        val body = JSONObject().put("text", text).put("format", "mp3")
+        call(text, "mp3")
+    }
+
+    /** PCM 16-bit mono 24 kHz untuk Live. */
+    fun pcm24k(text: String): ByteArray = call(text, "pcm")
+
+    private fun call(text: String, format: String): ByteArray {
+        val body = JSONObject().put("text", text).put("format", format)
             .put("normalize", true).put("temperature", 0.85).put("top_p", 0.85)
+        if (format == "pcm") body.put("sample_rate", 24_000)
         if (referenceId.isNotBlank()) body.put("reference_id", referenceId)
-        Http.post("https://api.fish.audio/v1/tts", body,
+        return Http.post("https://api.fish.audio/v1/tts", body,
             mapOf("Authorization" to "Bearer $apiKey", "model" to model), 180_000)
     }
 }
@@ -144,17 +237,32 @@ class GeminiAutoTts(private val p: Prefs, private val voice: String, private val
     }
 }
 
-/** Membuat mesin suara dari spesifikasi "mesin:id", mis. gemini:Kore, openai:coral, fish:<id>. */
+/** Membuat mesin suara dari spesifikasi "mesin:id", mis. gemini:Kore, eleven:<id>, fish:<id>. */
 object Tts {
+    /** Audio PCM 24 kHz untuk Live dengan suara ElevenLabs / Fish Audio (termasuk suara kloning). */
+    fun pcm24k(p: Prefs, spec: String, text: String): ByteArray {
+        val id = spec.substringAfter(':', "")
+        return when (spec.substringBefore(':')) {
+            "fish" -> {
+                require(p.fishKey.isNotBlank()) { "Kunci Fish Audio belum diatur" }
+                FishTts(p.fishKey, p.str("fish_model"), id).pcm24k(text)
+            }
+            else -> {
+                require(p.elevenKey.isNotBlank()) { "Kunci ElevenLabs belum diatur" }
+                ElevenTts(p.elevenKey, p.str("eleven_live_model").ifBlank { "eleven_flash_v2_5" }, id,
+                    p.str("gemini_style")).pcm24k(text)
+            }
+        }
+    }
+
     /** style: gaya bicara khusus (mis. tokoh video "ceria, bersemangat"); kosong = gaya pengaturan. */
     fun fromSpec(p: Prefs, spec: String, style: String = ""): TtsEngine {
         val engine = spec.substringBefore(':')
         val id = spec.substringAfter(':', "")
         return when (engine) {
-            "openai" -> {
-                require(p.openaiKey.isNotBlank()) { "Kunci OpenAI belum diisi di Pengaturan" }
-                OpenAiTts(p.openaiKey, p.str("openai_tts_model"), id.ifBlank { p.openaiVoice },
-                    style.ifBlank { p.str("gemini_style") })
+            "eleven" -> {
+                require(p.elevenKey.isNotBlank()) { "Kunci ElevenLabs belum diatur (Termux: bash tools/setup_keys.sh)" }
+                ElevenTts(p.elevenKey, p.str("eleven_model"), id.ifBlank { p.elevenVoice }, style.ifBlank { p.str("gemini_style") })
             }
             "fish" -> {
                 require(p.fishKey.isNotBlank()) { "Kunci Fish Audio belum diisi di Pengaturan" }
@@ -228,7 +336,7 @@ class VoiceOutput(private val context: Context) {
 
     private fun engine(p: Prefs, name: String): TtsEngine? = when (name) {
         "gemini" -> if (p.geminiApiKey.isNotEmpty()) GeminiAutoTts(p, p.geminiVoice) else null
-        "openai" -> if (p.openaiKey.isNotEmpty()) OpenAiTts(p.openaiKey, p.str("openai_tts_model"), p.openaiVoice,
+        "eleven" -> if (p.elevenKey.isNotEmpty()) ElevenTts(p.elevenKey, p.str("eleven_model"), p.elevenVoice,
             p.str("gemini_style")) else null
         "fish" -> if (p.fishKey.isNotEmpty()) FishTts(p.fishKey, p.str("fish_model"), p.fishVoice) else null
         "sovits" -> if (p.sovitsUrl.isNotEmpty() && p.sovitsRefPath.isNotEmpty())
@@ -237,7 +345,7 @@ class VoiceOutput(private val context: Context) {
     }
 
     /**
-     * Ucapkan teks. engineName: gemini | openai | fish | sovits | android (default = pengaturan).
+     * Ucapkan teks. engineName: gemini | eleven | fish | sovits | android (default = pengaturan).
      * Jika mesin utama gagal → Gemini → TTS Android sebagai cadangan terakhir.
      * Mengembalikan pesan error, atau null jika berhasil.
      */
@@ -258,7 +366,7 @@ class VoiceOutput(private val context: Context) {
         return if (errors.isEmpty()) null else errors.joinToString("; ")
     }
 
-    /** Ucapkan dengan spesifikasi suara tertentu (gemini:Kore, openai:coral, fish:<id>). Melempar error bila gagal. */
+    /** Ucapkan dengan spesifikasi suara tertentu (gemini:Kore, eleven:<id>, fish:<id>). Melempar error bila gagal. */
     suspend fun speakSpec(text: String, spec: String) = play(Tts.fromSpec(Prefs(context), spec).synthesize(text))
 
     fun stop() {

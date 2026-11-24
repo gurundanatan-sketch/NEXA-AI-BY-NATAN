@@ -84,7 +84,7 @@ object Tools {
                 .put("script", str("Naskah lengkap (kosongkan jika hanya topik)"))
                 .put("topic", str("Topik video bila tidak ada naskah"))
                 .put("duration_min", int("Perkiraan durasi menit bila dari topik"))
-                .put("voice", str("Suara: gemini:Kore, fish:<id kloning>, openai:coral. Kosong = default"))
+                .put("voice", str("Suara: gemini:Kore, fish:<id kloning>, eleven:<id suara ElevenLabs>. Kosong = default"))
                 .put("mode", choice("images = gambar + efek kamera (hemat), clips = klip video AI (mahal)", "images", "clips"))
                 .put("aspect", choice("Rasio", "9:16", "16:9", "1:1"))))
         // --- jam, catatan, perangkat ---

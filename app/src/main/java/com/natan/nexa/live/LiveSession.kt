@@ -94,20 +94,6 @@ class LiveSession(
 
     private fun connect() {
         scope.launch {
-            if (oa) {
-                val model = prefs.str("openai_live_model").ifBlank { "gpt-realtime-2.1" }
-                val b = if (prefs.openaiKey == com.natan.nexa.Route.SERVER) {
-                    prefs.syncRoute()
-                    Request.Builder().url("${com.natan.nexa.Route.wsBase()}/openai-ws?model=${enc(model)}").also { rb ->
-                        com.natan.nexa.Route.authHeaders().forEach { (k, v) -> rb.header(k, v) }
-                    }
-                } else {
-                    Request.Builder().url("wss://api.openai.com/v1/realtime?model=${enc(model)}")
-                        .header("Authorization", "Bearer ${prefs.openaiKey}")
-                }
-                ws = client.newWebSocket(b.build(), Listener())
-                return@launch
-            }
             val key = prefs.geminiApiKey
             if (key == com.natan.nexa.Route.SERVER) {
                 // Lewat server NEXA: kunci Gemini ada di server, bukan di HP.
@@ -148,10 +134,11 @@ class LiveSession(
     private val playQueue = LinkedBlockingQueue<ByteArray>()
     @Volatile private var lastPlayMs = 0L
 
-    /** Mesin Live: Gemini (default) atau OpenAI Realtime bila suara Live yang dipilih "openai:…". */
+    /** Suara Live: "gemini:Kore" (suara asli Gemini) atau "eleven:<id>" / "fish:<id>" (suara pilihan/kloning). */
     private val liveSpec: String get() = prefs.str("live_voice_spec")
+    /** true = suara Live memakai ElevenLabs / Fish Audio (bukan suara bawaan Gemini). */
     private var oa = false
-    private val inRate: Int get() = if (oa) 24_000 else IN_RATE
+    private val inRate: Int get() = IN_RATE
 
     // Sesi tanpa batas: sambung ulang otomatis memakai handle resumption Gemini.
     @Volatile private var resumeHandle: String? = null
@@ -179,14 +166,14 @@ class LiveSession(
         this.firstCommand = command
         if (running.getAndSet(true)) return
         if (prefs.geminiApiKey.isEmpty()) { log("Isi Gemini API key dulu."); running.set(false); return }
-        resumeHandle = null; everReady = false; reconnectTries = 0; quiet = false; pendingQuiet = false
-        oa = liveSpec.startsWith("openai:")
-        if (oa && prefs.openaiKey.isEmpty()) { log("Suara Live OpenAI butuh kunci OpenAI di server."); running.set(false); return }
+        resumeHandle = null; everReady = false; reconnectTries = 0; quiet = false; pendingQuiet = false; modelIdx = 0
+        oa = liveSpec.startsWith("eleven:") || liveSpec.startsWith("fish:")
+        if (oa) startVoiceWorker()
         setupAudioRoute(true)
         startPlayer()
         authMode = goodMode
         connect()
-        log(if (oa) "Menyambung ke OpenAI Realtime (suara ${liveSpec.substringAfter(':')})…" else "Menyambung ke Gemini Live (${prefs.liveModel})…")
+        log("Menyambung ke Gemini Live (${prefs.liveModel})" + (if (oa) " · suara ${liveSpec.substringBefore(':')}…" else "…"))
     }
 
     fun stop() {
@@ -225,7 +212,7 @@ class LiveSession(
 
     private inner class Listener : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            webSocket.send((if (oa) openAiSession() else setupMessage()).toString())
+            webSocket.send(setupMessage().toString())
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) = handle(text)
@@ -234,6 +221,7 @@ class LiveSession(
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             webSocket.close(1000, null)
             if (webSocket !== ws) return
+            if (retryModel(code, reason)) return
             if (retryAuth(code, reason)) return
             if (running.get() && everReady && code != 1007 && reconnectTries < 6) return  // onClosed akan menyambung ulang
             log("Live ditutup server ($code) $reason")
@@ -262,12 +250,31 @@ class LiveSession(
     }
 
     /** Kunci ditolak sebelum tersambung → coba cara masuk berikutnya (header → ?key= → token sementara). */
+    /** Model Live cadangan bila model pilihan tidak tersedia untuk kunci ini. */
+    private val liveModels: List<String> get() = listOf(prefs.liveModel,
+        "gemini-2.5-flash-native-audio-preview-12-2025", "gemini-2.5-flash-native-audio-preview-09-2025",
+        "gemini-live-2.5-flash-preview", "gemini-2.0-flash-live-001").filter { it.isNotBlank() }.distinct()
+    private var modelIdx = 0
+    private val currentModel: String get() = liveModels.getOrElse(modelIdx) { prefs.liveModel }
+
+    /** Model ditolak ("not found / not supported") sebelum tersambung → coba model berikutnya. */
+    private fun retryModel(code: Int, reason: String): Boolean {
+        val r = reason.lowercase()
+        val modelErr = code == 1008 && ("not found" in r || "not supported" in r || "model" in r) && "api key" !in r
+        if (!modelErr || ready.get() || everReady || !running.get() || modelIdx >= liveModels.size - 1) return false
+        modelIdx++
+        log("Model Live tidak tersedia, mencoba ${currentModel}…")
+        ws = null
+        connect()
+        return true
+    }
+
     private fun retryAuth(code: Int, reason: String): Boolean {
         val r = reason.lowercase()
         val authErr = code == 1007 || code == 1008 || code == 401 || code == 403 ||
             "api key" in r || "credential" in r || "unauthenticated" in r || "permission" in r
         if (!authErr || ready.get() || !running.get() || authMode >= 2) return false
-        if (oa || prefs.geminiApiKey == com.natan.nexa.Route.SERVER) return false
+        if (prefs.geminiApiKey == com.natan.nexa.Route.SERVER) return false
         authMode++
         log("Kunci ditolak, mencoba cara masuk lain (${authMode + 1}/3)…")
         ws = null
@@ -290,6 +297,7 @@ class LiveSession(
     }
 
     private fun onTurnComplete() {
+        if (oa && !quiet) voiceFeed("", flush = true)
         if (quiet) modelText.clear()
         flushTranscripts("")
         if (pendingQuiet) { pendingQuiet = false; quiet = true; log("🤫 Nexa diam. Panggil \"${prefs.assistantName}\" atau bilang \"lanjut\" untuk ngobrol lagi.") }
@@ -300,92 +308,60 @@ class LiveSession(
         else { quiet = false; pendingQuiet = false; "OK: kembali ngobrol" }
     } else try { tools.execute(name, args) } catch (e: Exception) { "GAGAL: ${e.message}" }
 
-    // ------------------------------------------------------------------ OPENAI REALTIME (suara OpenAI di Live)
+    // ------------------------------------------------------------------ SUARA KLONING DI LIVE
+    // Live tetap memakai otak Gemini (dengar, paham, kontrol HP), tapi suaranya diganti suara pilihan
+    // (ElevenLabs / Fish Audio / kloning sendiri): teks jawaban Gemini diucapkan per kalimat.
 
-    /** Skema fungsi Gemini (tipe huruf besar) → JSON Schema OpenAI (huruf kecil). */
-    private fun toJsonSchema(o: JSONObject): JSONObject {
-        val out = JSONObject()
-        for (k in o.keys()) {
-            val v = o.get(k)
-            out.put(k, when {
-                k == "type" && v is String -> v.lowercase()
-                v is JSONObject -> toJsonSchema(v)
-                else -> v
-            })
-        }
-        return out
-    }
+    /** Teks jawaban → audio PCM 24 kHz untuk pemutar Live. */
+    private val voiceJobs = kotlinx.coroutines.channels.Channel<Pair<Int, String>>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+    @Volatile private var voiceGen = 0
+    private val sentence = StringBuilder()
+    private var voiceWorker: kotlinx.coroutines.Job? = null
 
-    private fun openAiSession(): JSONObject {
-        Prompts.userName = prefs.str("user_name"); Prompts.language = prefs.str("assistant_lang")
-        val system = Prompts.live(prefs.assistantName) + "\n\nAPLIKASI TERPASANG: " + tools.installedApps +
-            "\n\nUntuk info terkini/fakta, panggil fungsi google_search lalu sebutkan sumbernya."
-        val decl = Tools.declarations(forLive = true)
-        val toolsArr = JSONArray()
-        for (i in 0 until decl.length()) {
-            val f = decl.getJSONObject(i)
-            toolsArr.put(JSONObject().put("type", "function").put("name", f.getString("name"))
-                .put("description", f.optString("description"))
-                .put("parameters", f.optJSONObject("parameters")?.let { toJsonSchema(it) }
-                    ?: JSONObject().put("type", "object").put("properties", JSONObject())))
-        }
-        val pcm = JSONObject().put("type", "audio/pcm").put("rate", 24_000)
-        return JSONObject().put("type", "session.update").put("session", JSONObject()
-            .put("type", "realtime")
-            .put("model", prefs.str("openai_live_model").ifBlank { "gpt-realtime-2.1" })
-            .put("output_modalities", JSONArray().put("audio"))
-            .put("instructions", system)
-            .put("audio", JSONObject()
-                .put("input", JSONObject().put("format", pcm)
-                    .put("transcription", JSONObject().put("model", "gpt-4o-mini-transcribe"))
-                    .put("turn_detection", JSONObject().put("type", "semantic_vad")
-                        .put("interrupt_response", prefs.liveBargeIn)))
-                .put("output", JSONObject().put("format", JSONObject(pcm.toString()))
-                    .put("voice", liveSpec.substringAfter(':').ifBlank { "marin" })))
-            .put("tools", toolsArr)
-            .put("tool_choice", "auto"))
-    }
-
-    private fun handleOpenAi(msg: JSONObject) {
-        when (msg.optString("type")) {
-            "session.updated" -> if (!ready.get()) onReady()
-            "input_audio_buffer.speech_started" -> if (prefs.liveBargeIn) {
-                playQueue.clear()
-                track?.run { pause(); flush(); play() }
-                if (modelText.isNotBlank()) flushTranscripts(" (disela)")
-            }
-            "conversation.item.input_audio_transcription.delta" -> msg.optString("delta").let {
-                userText.append(it); lastActivity = System.currentTimeMillis()
-                if (quiet) checkWakeFromQuiet(it)
-            }
-            "conversation.item.input_audio_transcription.completed" -> {
-                val t = msg.optString("transcript")
-                if (userText.isBlank()) { userText.append(t); if (quiet) checkWakeFromQuiet(t) }
-                lastActivity = System.currentTimeMillis()
-            }
-            "response.output_audio.delta" -> if (!quiet) msg.optString("delta").takeIf { it.isNotEmpty() }
-                ?.let { playQueue.offer(Base64.decode(it, Base64.DEFAULT)) }
-            "response.output_audio_transcript.delta" -> if (!quiet) { modelText.append(msg.optString("delta")); lastActivity = System.currentTimeMillis() }
-            "response.done" -> {
-                val output = msg.optJSONObject("response")?.optJSONArray("output") ?: JSONArray()
-                val calls = (0 until output.length()).mapNotNull { output.optJSONObject(it) }
-                    .filter { it.optString("type") == "function_call" }
-                onTurnComplete()
-                if (calls.isNotEmpty()) scope.launch {
-                    for (c in calls) {
-                        val name = c.optString("name")
-                        val args = try { JSONObject(c.optString("arguments").ifBlank { "{}" }) } catch (e: Exception) { JSONObject() }
-                        log("🔧 $name $args")
-                        val result = runTool(name, args)
-                        send(JSONObject().put("type", "conversation.item.create").put("item", JSONObject()
-                            .put("type", "function_call_output").put("call_id", c.optString("call_id")).put("output", result)))
+    private fun startVoiceWorker() {
+        if (voiceWorker != null) return
+        voiceWorker = scope.launch {
+            for ((gen, text) in voiceJobs) {
+                if (gen != voiceGen || quiet) continue
+                try {
+                    val pcm = com.natan.nexa.voice.Tts.pcm24k(prefs, liveSpec, text)
+                    if (gen != voiceGen || quiet) continue
+                    var o = 0
+                    while (o < pcm.size) {
+                        val n = minOf(9600, pcm.size - o)
+                        playQueue.offer(pcm.copyOfRange(o, o + n)); o += n
                     }
-                    send(JSONObject().put("type", "response.create"))
+                    lastActivity = System.currentTimeMillis()
+                } catch (e: Exception) {
+                    log("Suara ${liveSpec.substringBefore(':')}: ${e.message?.take(140)}")
                 }
             }
-            "error" -> log("Live OpenAI: ${msg.optJSONObject("error")?.optString("message") ?: msg}")
         }
     }
+
+    /** Potongan teks jawaban → ucapkan setiap kalimat selesai. */
+    private fun voiceFeed(piece: String, flush: Boolean = false) {
+        sentence.append(piece)
+        while (true) {
+            val t = sentence.toString()
+            val idx = t.indexOfFirst { it == '.' || it == '!' || it == '?' || it == '\n' || it == '…' }
+            val cut = when {
+                idx >= 0 && (idx >= 12 || flush) -> idx + 1
+                t.length > 180 -> t.lastIndexOf(' ', 180).takeIf { it > 40 } ?: 180
+                else -> -1
+            }
+            if (cut <= 0) break
+            val part = t.substring(0, cut).trim()
+            sentence.delete(0, cut)
+            if (part.isNotBlank()) voiceJobs.trySend(voiceGen to part)
+        }
+        if (flush) {
+            val rest = sentence.toString().trim(); sentence.clear()
+            if (rest.isNotBlank()) voiceJobs.trySend(voiceGen to rest)
+        }
+    }
+
+    private fun voiceCancel() { voiceGen++; sentence.clear() }
 
     /** Sambung ulang Live tanpa memutus obrolan (dipakai saat goAway / koneksi putus). */
     private fun reconnect() {
@@ -425,7 +401,7 @@ class LiveSession(
         Prompts.userName = prefs.str("user_name"); Prompts.language = prefs.str("assistant_lang")
         val system = Prompts.live(prefs.assistantName) + "\n\nAPLIKASI TERPASANG: " + tools.installedApps
         val setup = JSONObject()
-            .put("model", "models/${prefs.liveModel}")
+            .put("model", "models/$currentModel")
             .put("generationConfig", JSONObject()
                 .put("responseModalities", JSONArray().put("AUDIO"))
                 .put("speechConfig", JSONObject().put("voiceConfig", JSONObject()
@@ -446,7 +422,6 @@ class LiveSession(
     private fun handle(raw: String) {
         val msg = try { JSONObject(raw) } catch (e: Exception) { return }
 
-        if (oa) { handleOpenAi(msg); return }
 
         if (msg.has("setupComplete")) {
             goodMode = authMode
@@ -459,10 +434,14 @@ class LiveSession(
                 userText.append(it); lastActivity = System.currentTimeMillis()
                 if (quiet) checkWakeFromQuiet(it)
             }
-            if (!quiet) sc.optJSONObject("outputTranscription")?.optString("text")?.let { modelText.append(it); lastActivity = System.currentTimeMillis() }
+            if (!quiet) sc.optJSONObject("outputTranscription")?.optString("text")?.let {
+                modelText.append(it); lastActivity = System.currentTimeMillis()
+                if (oa) voiceFeed(it)
+            }
 
             if (sc.optBoolean("interrupted", false)) {
                 // BARGE-IN: pengguna menyela → buang sisa audio Nexa
+                if (oa) voiceCancel()
                 playQueue.clear()
                 track?.run { pause(); flush(); play() }
                 flushTranscripts(" (disela)")
@@ -470,7 +449,7 @@ class LiveSession(
             sc.optJSONObject("modelTurn")?.optJSONArray("parts")?.let { parts ->
                 for (i in 0 until parts.length()) {
                     val data = parts.optJSONObject(i)?.optJSONObject("inlineData")?.optString("data")
-                    if (!data.isNullOrEmpty() && !quiet) playQueue.offer(Base64.decode(data, Base64.DEFAULT))
+                    if (!data.isNullOrEmpty() && !quiet && !oa) playQueue.offer(Base64.decode(data, Base64.DEFAULT))
                 }
             }
             if (sc.optBoolean("turnComplete", false)) onTurnComplete()
@@ -561,8 +540,7 @@ class LiveSession(
                 val speaking = System.currentTimeMillis() - lastPlayMs < 400
                 if (!prefs.liveBargeIn && speaking) continue
                 val b64 = Base64.encodeToString(buf, 0, n, Base64.NO_WRAP)
-                if (oa) send(JSONObject().put("type", "input_audio_buffer.append").put("audio", b64))
-                else send(JSONObject().put("realtimeInput", JSONObject().put("audio",
+                send(JSONObject().put("realtimeInput", JSONObject().put("audio",
                     JSONObject().put("data", b64).put("mimeType", "audio/pcm;rate=$rate"))))
             }
         }.apply { name = "nexa-mic"; start() }
