@@ -15,7 +15,7 @@ android {
         // APK baru selalu bisa menimpa versi lama (dengan tanda tangan yang sama).
         val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
         versionCode = 100 + run
-        versionName = "7.1.$run"
+        versionName = "7.2.$run"
 
         // Alamat server NEXA dari GitHub Secrets (tools/setup_server.sh).
         fun secret(name: String) = "\"" + (System.getenv(name) ?: "").trim()
@@ -25,7 +25,6 @@ android {
         buildConfigField("String", "APP_TOKEN", secret("NEXA_APP_TOKEN"))
         // Mode mandiri (tanpa server): kunci API & rahasia Premium dari GitHub Secrets (diatur lewat Termux).
         buildConfigField("String", "GEMINI_KEY", secret("NEXA_GEMINI_KEY"))
-        buildConfigField("String", "ELEVEN_KEY", secret("NEXA_ELEVEN_KEY"))
         buildConfigField("String", "FISH_KEY", secret("NEXA_FISH_KEY"))
         buildConfigField("String", "TIKTOK_KEY", secret("NEXA_TIKTOK_KEY"))
         buildConfigField("String", "PREMIUM_SECRET", secret("NEXA_PREMIUM_SECRET"))

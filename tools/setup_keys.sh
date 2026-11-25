@@ -8,7 +8,6 @@ for p in curl gh; do command -v "$p" >/dev/null || pkg install -y "$p"; done
 
 code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 t_gemini() { [ "$(code -H "x-goog-api-key: $1" "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1")" = 200 ]; }
-t_eleven() { [ "$(code -H "xi-api-key: $1" "https://api.elevenlabs.io/v1/user")" = 200 ]; }
 t_fish()   { [ "$(code -H "Authorization: Bearer $1" "https://api.fish.audio/model?page_size=1")" = 200 ]; }
 t_none()   { true; }
 
@@ -28,14 +27,14 @@ ask() {  # ask SECRET label test
 
 echo "== Tempel kunci lalu Enter. Tulisan TIDAK terlihat (normal). Kosongkan = lewati."
 ask NEXA_GEMINI_KEY "1) Gemini API key (aistudio.google.com/apikey)" t_gemini
-ask NEXA_ELEVEN_KEY "2) ElevenLabs API key (elevenlabs.io/app/settings/api-keys)" t_eleven
-ask NEXA_FISH_KEY   "3) Fish Audio API key (fish.audio)" t_fish
-ask NEXA_TIKTOK_KEY "4) TikTok LIVE key (eulerstream.com / tik.tools, opsional)" t_none
+ask NEXA_FISH_KEY   "2) Fish Audio API key (fish.audio)" t_fish
+ask NEXA_TIKTOK_KEY "3) TikTok LIVE key (eulerstream.com / tik.tools, opsional)" t_none
 
 # Mode mandiri: matikan alamat server lama (bila pernah diisi)
 gh secret delete NEXA_SERVER_URL -R "$REPO" >/dev/null 2>&1 || true
 gh secret delete NEXA_APP_TOKEN -R "$REPO" >/dev/null 2>&1 || true
-gh secret delete NEXA_OPENAI_KEY -R "$REPO" >/dev/null 2>&1 || true   # OpenAI sudah tidak dipakai
+gh secret delete NEXA_OPENAI_KEY -R "$REPO" >/dev/null 2>&1 || true   # OpenAI & ElevenLabs sudah tidak dipakai
+gh secret delete NEXA_ELEVEN_KEY -R "$REPO" >/dev/null 2>&1 || true
 
 # Siapkan rahasia kode Premium (sekali saja)
 bash "$(dirname "$0")/buat_kode.sh" --init

@@ -6,6 +6,12 @@ Asisten AI super-agent untuk Android. NEXA bisa **ngobrol real-time dua arah (da
 
 ---
 
+## 🆕 Versi 7.2
+
+- ElevenLabs dihapus. Suara memakai **30 suara Google Gemini** plus **suara kloning Fish Audio / Gemini**.
+  Suara kloning tetap bisa dipakai untuk asisten, Live real-time, dan video. Impor audio & video dari galeri tetap ada.
+- `tools/setup_keys.sh` kini hanya meminta kunci Gemini, Fish Audio, dan TikTok (opsional).
+
 ## 🆕 Versi 7.1
 
 - OpenAI dihapus dan diganti **ElevenLabs**: suara paling natural (Eleven v3, dengan cadangan otomatis ke Multilingual v2 dan Flash v2.5),

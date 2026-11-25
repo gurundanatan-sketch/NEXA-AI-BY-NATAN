@@ -290,48 +290,12 @@ class NexaBridge(private val act: MainActivity) {
     private val geminiVoices = listOf("Kore", "Puck", "Aoede", "Charon", "Fenrir", "Leda", "Orus", "Zephyr", "Callirrhoe", "Autonoe",
         "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar",
         "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat")
-    /** Suara siap pakai ElevenLabs (nama · id). Suara dari akun ElevenLabs Anda ikut dimuat otomatis. */
-    private val elevenVoices = listOf(
-        "Sarah" to "EXAVITQu4vr4xnSDxMaL", "Laura" to "FGY2WhTYpPnrIDTdsKH5", "Alice" to "Xb7hH8MSUJpSbSDYk0k2",
-        "Matilda" to "XrExE9yKIg1WjnnlVkGX", "Jessica" to "cgSgspJ2msm6clMCkdW9", "Lily" to "pFZP5JQG7iQjIQuC4Bku",
-        "River" to "SAz9YHcvj6GT2YYXdXww", "Roger" to "CwhRBWXzGAHq8TQ4Fs17", "Charlie" to "IKne3meq5aSn9XLyUdCD",
-        "George" to "JBFqnCBsd6RMkjVDRZzb", "Callum" to "N2lVS1w4EtoT3dr4eOWO", "Liam" to "TX3LPaxmHKxFdv7VOQHJ",
-        "Will" to "bIHbv24MWmeRgasZH58o", "Eric" to "cjVigY5qzO86Huf0OWal", "Chris" to "iP95p4xoKVk53GoZ742B",
-        "Brian" to "nPczCjzI2devNBz1zQrb", "Daniel" to "onwK4e9ZLuTAKqWW03F9", "Bill" to "pqHfZKP75CvOlQylNhV4")
-
-    /** Muat daftar suara akun ElevenLabs (termasuk kloning dari situs ElevenLabs) di latar. */
-    private fun refreshElevenVoices() {
-        if (prefs.elevenKey.isBlank()) return
-        scope.launch(Dispatchers.IO) {
-            try {
-                val res = JSONObject(String(Http.get("https://api.elevenlabs.io/v1/voices", mapOf("xi-api-key" to prefs.elevenKey), 20_000)))
-                val arr = res.optJSONArray("voices") ?: return@launch
-                val out = JSONArray()
-                for (i in 0 until arr.length()) {
-                    val v = arr.getJSONObject(i)
-                    out.put(JSONObject().put("id", "eleven:" + v.optString("voice_id")).put("name", "ElevenLabs " + v.optString("name"))
-                        .put("cloned", v.optString("category") == "cloned"))
-                }
-                prefs.put("eleven_voices_cache", out.toString())
-            } catch (_: Exception) { }
-        }
-    }
 
     @JavascriptInterface fun voices(): String {
         val out = JSONArray()
         val saved = try { JSONArray(prefs.str("voices")) } catch (e: Exception) { JSONArray() }
         for (i in 0 until saved.length()) out.put(saved.getJSONObject(i))
         geminiVoices.forEach { out.put(JSONObject().put("id", "gemini:$it").put("name", "Gemini $it").put("cloned", false)) }
-        if (prefs.elevenKey.isNotBlank()) {
-            val seen = HashSet<String>()
-            for (i in 0 until out.length()) seen += out.getJSONObject(i).optString("id")
-            val cache = try { JSONArray(prefs.str("eleven_voices_cache")) } catch (e: Exception) { JSONArray() }
-            for (i in 0 until cache.length()) { val v = cache.getJSONObject(i); if (seen.add(v.optString("id"))) out.put(v) }
-            elevenVoices.forEach { (n, id) ->
-                if (seen.add("eleven:$id")) out.put(JSONObject().put("id", "eleven:$id").put("name", "ElevenLabs $n").put("cloned", false))
-            }
-            refreshElevenVoices()
-        }
         return out.toString()
     }
 
@@ -342,7 +306,7 @@ class NexaBridge(private val act: MainActivity) {
         prefs.put("voices", keep.toString())
     }
 
-    /** json: {name, engine: eleven|fish|gemini, sample: path, consent: path, agree: true} → event "cloned". */
+    /** json: {name, engine: fish|gemini, sample: path, consent: path, agree: true} → event "cloned". */
     @JavascriptInterface fun cloneVoice(json: String) {
         if (locked()) return
         scope.launch {
@@ -355,7 +319,6 @@ class NexaBridge(private val act: MainActivity) {
                 val spec = withContext(Dispatchers.IO) {
                     when (o.optString("engine", "fish")) {
                         "gemini" -> "gemini:" + cloneGemini(sample, File(o.optString("consent")), name)
-                        "eleven" -> "eleven:" + StudioApi(prefs).cloneEleven(sample, name)
                         else -> "fish:" + StudioApi(prefs).cloneFish(sample, name)
                     }
                 }
@@ -385,7 +348,7 @@ class NexaBridge(private val act: MainActivity) {
             .ifBlank { throw RuntimeException("Gemini tidak mengembalikan ID suara") }
     }
 
-    /** Putar contoh suara dari spesifikasi mis. fish:<id>, eleven:<id>, gemini:Kore. */
+    /** Putar contoh suara dari spesifikasi mis. fish:<id>, gemini:Kore. */
     @JavascriptInterface fun previewVoice(spec: String, text: String) {
         if (locked()) return
         scope.launch {
@@ -420,9 +383,6 @@ class NexaBridge(private val act: MainActivity) {
             test("gemini", prefs.geminiApiKey) {
                 Http.get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1",
                     mapOf("x-goog-api-key" to prefs.geminiApiKey), 20_000)
-            }
-            test("eleven", prefs.elevenKey) {
-                Http.get("https://api.elevenlabs.io/v1/user", mapOf("xi-api-key" to prefs.elevenKey), 20_000)
             }
             test("fish", prefs.fishKey) {
                 Http.get("https://api.fish.audio/model?page_size=1", mapOf("Authorization" to "Bearer ${prefs.fishKey}"), 20_000)

@@ -134,9 +134,9 @@ class LiveSession(
     private val playQueue = LinkedBlockingQueue<ByteArray>()
     @Volatile private var lastPlayMs = 0L
 
-    /** Suara Live: "gemini:Kore" (suara asli Gemini) atau "eleven:<id>" / "fish:<id>" (suara pilihan/kloning). */
+    /** Suara Live: "gemini:Kore" (suara asli Gemini) atau "fish:<id>" (suara pilihan/kloning). */
     private val liveSpec: String get() = prefs.str("live_voice_spec")
-    /** true = suara Live memakai ElevenLabs / Fish Audio (bukan suara bawaan Gemini). */
+    /** true = suara Live memakai Fish Audio (bukan suara bawaan Gemini). */
     private var oa = false
     private val inRate: Int get() = IN_RATE
 
@@ -167,7 +167,7 @@ class LiveSession(
         if (running.getAndSet(true)) return
         if (prefs.geminiApiKey.isEmpty()) { log("Isi Gemini API key dulu."); running.set(false); return }
         resumeHandle = null; everReady = false; reconnectTries = 0; quiet = false; pendingQuiet = false; modelIdx = 0
-        oa = liveSpec.startsWith("eleven:") || liveSpec.startsWith("fish:")
+        oa = liveSpec.startsWith("fish:")
         if (oa) startVoiceWorker()
         setupAudioRoute(true)
         startPlayer()
@@ -310,7 +310,7 @@ class LiveSession(
 
     // ------------------------------------------------------------------ SUARA KLONING DI LIVE
     // Live tetap memakai otak Gemini (dengar, paham, kontrol HP), tapi suaranya diganti suara pilihan
-    // (ElevenLabs / Fish Audio / kloning sendiri): teks jawaban Gemini diucapkan per kalimat.
+    // (Fish Audio / kloning sendiri): teks jawaban Gemini diucapkan per kalimat.
 
     /** Teks jawaban → audio PCM 24 kHz untuk pemutar Live. */
     private val voiceJobs = kotlinx.coroutines.channels.Channel<Pair<Int, String>>(kotlinx.coroutines.channels.Channel.UNLIMITED)

@@ -50,7 +50,6 @@ jobs:
           NEXA_APP_TOKEN: ${{ secrets.NEXA_APP_TOKEN }}
           # Mode mandiri: kunci API & rahasia Premium (tools/setup_keys.sh + tools/buat_kode.sh)
           NEXA_GEMINI_KEY: ${{ secrets.NEXA_GEMINI_KEY }}
-          NEXA_ELEVEN_KEY: ${{ secrets.NEXA_ELEVEN_KEY }}
           NEXA_FISH_KEY: ${{ secrets.NEXA_FISH_KEY }}
           NEXA_TIKTOK_KEY: ${{ secrets.NEXA_TIKTOK_KEY }}
           NEXA_PREMIUM_SECRET: ${{ secrets.NEXA_PREMIUM_SECRET }}
@@ -61,7 +60,7 @@ jobs:
       - name: Ganti nama APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/*.apk out/NEXA-AI-BY-NATAN-v7.1.${{ github.run_number }}.apk
+          cp app/build/outputs/apk/release/*.apk out/NEXA-AI-BY-NATAN-v7.2.${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         with:

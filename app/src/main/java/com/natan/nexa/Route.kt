@@ -4,7 +4,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Server pribadi NEXA (Cloudflare Workers). Bila aktif, semua panggilan Gemini, ElevenLabs,
+ * Server pribadi NEXA (Cloudflare Workers). Bila aktif, semua panggilan Gemini,
  * Fish Audio, Live, dan TikTok dialihkan ke server — kunci API tidak pernah ada di HP.
  * Kunci "SERVER" adalah penanda: artinya "pakai kunci yang tersimpan di server".
  */
@@ -18,20 +18,17 @@ object Route {
     @Volatile var device = ""
 
     private const val G = "https://generativelanguage.googleapis.com"
-    private const val O = "https://api.elevenlabs.io"
     private const val F = "https://api.fish.audio"
 
     val active: Boolean get() = server.isNotBlank()
 
     fun apply(url: String, headers: Map<String, String>): Pair<String, Map<String, String>> {
-        val viaServer = headers["x-goog-api-key"] == SERVER || headers["Authorization"] == "Bearer $SERVER" ||
-            headers["xi-api-key"] == SERVER
+        val viaServer = headers["x-goog-api-key"] == SERVER || headers["Authorization"] == "Bearer $SERVER"
         if (!viaServer || !active) return url to headers
-        val h = headers.filterKeys { it != "x-goog-api-key" && it != "Authorization" && it != "xi-api-key" }.toMutableMap()
+        val h = headers.filterKeys { it != "x-goog-api-key" && it != "Authorization" }.toMutableMap()
         h.putAll(authHeaders())
         val u = when {
             url.startsWith(G) -> "$server/gemini" + url.removePrefix(G)
-            url.startsWith(O) -> "$server/eleven" + url.removePrefix(O)
             url.startsWith(F) -> "$server/fish" + url.removePrefix(F)
             else -> url
         }

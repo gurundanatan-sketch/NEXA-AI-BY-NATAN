@@ -31,7 +31,7 @@ object Prompts {
     val APP_INFO = """
         Tentang aplikasi NEXA AI BY NATAN (jelaskan bila ditanya fungsi/keunggulan/manfaat/cara pakai):
         - Asisten suara real-time (Live): ngobrol dua arah, bisa disela kapan saja, suara natural 30+ pilihan
-          (suara Google Gemini & ElevenLabs, plus suara kloning), bisa dipanggil cukup dengan menyebut nama dari luar aplikasi.
+          (30 suara Google Gemini, plus suara kloning), bisa dipanggil cukup dengan menyebut nama dari luar aplikasi.
         - Kontrol HP penuh lewat suara: buka aplikasi, baca layar, klik, ketik, scroll, kirim WhatsApp,
           baca & balas notifikasi chat, angkat/tolak telepon, alarm, timer, kalender, musik, navigasi peta,
           salin/bagikan teks — sangat membantu tunanetra memakai HP tanpa melihat layar.

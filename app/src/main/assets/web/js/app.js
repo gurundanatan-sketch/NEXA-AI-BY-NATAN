@@ -54,7 +54,7 @@
     syncGeminiAuto();
     // Kunci tertanam otomatis → tampilkan status, kolom boleh kosong
     // Server NEXA aktif → kolom kunci disembunyikan (semua kunci diatur dari Termux)
-    [['gemini_key', 'AIza…'], ['eleven_key', '…'], ['fish_key', '…'], ['tt_api_key', 'dari eulerstream.com atau tik.tools']].forEach(([k, ph]) => {
+    [['gemini_key', 'AIza…'], ['fish_key', '…'], ['tt_api_key', 'dari eulerstream.com atau tik.tools']].forEach(([k, ph]) => {
       const el = $(`[data-pref="${k}"]`);
       if (!el) return;
       el.placeholder = S['builtin_' + k] ? '✓ Terpasang otomatis' : ph;
@@ -67,7 +67,7 @@
     });
     const sh = $('#serverHint');
     if (sh) sh.innerHTML = S.server_active
-      ? '🌐 <b>Server NEXA aktif</b> — semua kunci API (Gemini, ElevenLabs, Fish Audio, TikTok) diatur dari Termux. Tidak perlu isi apa pun di sini.'
+      ? '🌐 <b>Server NEXA aktif</b> — semua kunci API (Gemini, Fish Audio, TikTok) diatur dari Termux. Tidak perlu isi apa pun di sini.'
       : '🔐 Mode mandiri — kunci API tertanam di aplikasi (diatur pembuat lewat Termux: <b>bash tools/setup_keys.sh</b>). Isi kolom di bawah hanya untuk mengganti kunci di HP ini.';
   }
 
@@ -107,8 +107,8 @@
   });
   $('#checkKeys').addEventListener('click', () => { $('#keysResult').innerHTML = '<div class="hint">Mengecek…</div>'; A.checkKeys(); });
   function renderKeys(d) {
-    const names = d.server ? { server: 'Server NEXA', gemini: 'Gemini (AI Studio)', eleven: 'ElevenLabs', fish: 'Fish Audio', tiktok: 'TikTok LIVE' }
-      : { gemini: 'Gemini (AI Studio)', eleven: 'ElevenLabs', fish: 'Fish Audio', tiktok: 'TikTok LIVE' };
+    const names = d.server ? { server: 'Server NEXA', gemini: 'Gemini (AI Studio)', fish: 'Fish Audio', tiktok: 'TikTok LIVE' }
+      : { gemini: 'Gemini (AI Studio)', fish: 'Fish Audio', tiktok: 'TikTok LIVE' };
     $('#keysResult').innerHTML = Object.keys(names).map((k) => {
       const v = d[k] || 'kosong';
       const ic = v === 'ok' ? '✅' : v === 'kosong' ? '⚪' : '❌';
@@ -466,7 +466,6 @@
     $$('[data-vdef]').forEach((b) => b.addEventListener('click', () => {
       const id = b.dataset.vdef, part = { video_voice: id };
       if (id.startsWith('fish:')) Object.assign(part, { fish_voice: id.slice(5), voice_engine: 'fish', gemini_voice_auto: false });
-      if (id.startsWith('eleven:')) Object.assign(part, { eleven_voice: id.slice(7), voice_engine: 'eleven', gemini_voice_auto: false });
       if (id.startsWith('gemini:')) Object.assign(part, { tts_voice: id.slice(7), voice_engine: 'gemini', gemini_voice: id.slice(7) });
       if (S.gemini_voice_auto !== false) { part.voice_spec = id; delete part.gemini_voice_auto; delete part.voice_engine; }
       save(part); syncGeminiAuto(); toast('Jadi suara default video & asisten ★');
